@@ -1,80 +1,36 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin } from "obsidian";
+import OpenAI from "openai";
 import {
   DEFAULT_SETTINGS,
   NoteWeaverSettings,
   NoteWeaverSettingTab,
 } from "./settings";
 
-// Remember to rename these class names!
-
 export default class NoteWeaver extends Plugin {
   settings: NoteWeaverSettings;
+  client: OpenAI;
 
   async onload() {
     await this.loadSettings();
 
-    // 在左侧功能区创建一个图标
-    this.addRibbonIcon("dice", "Sample", (evt: MouseEvent) => {
-      // 当用户点击图标时调用
-      new Notice("This is a notice!");
-    });
-
     // 添加一个状态栏项到应用底部，在移动端应用中无效
     const statusBarItemEl = this.addStatusBarItem();
-    statusBarItemEl.setText("Status bar text");
 
-    // 添加一个简单的命令，可以在任何地方触发
-    this.addCommand({
-      id: "open-modal-simple",
-      name: "Open modal (simple)",
-      callback: () => {
-        new SampleModal(this.app).open();
-      },
-    });
-    // 添加一个编辑器命令，可以对当前编辑器实例执行一些操作
-    this.addCommand({
-      id: "replace-selected",
-      name: "Replace selected content",
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        editor.replaceSelection("Sample editor command");
-      },
-    });
-    // 添加一个复杂的命令，可以检查应用的当前状态是否允许执行该命令
-    this.addCommand({
-      id: "open-modal-complex",
-      name: "Open modal (complex)",
-      checkCallback: (checking: boolean) => {
-        // 要检查的条件
-        const markdownView = this.app.workspace.getActiveViewOfType(
-          MarkdownView,
-        );
-        if (markdownView) {
-          // 如果 checking 为 true，我们只是"检查"命令是否可以运行
-          // 如果 checking 为 false，那么我们真的要执行该操作
-          if (!checking) {
-            new SampleModal(this.app).open();
-          }
+    // 异步验证配置，不阻塞插件加载
+    this.validateConfig()
+      .then(([isValid, message]) => {
+        statusBarItemEl.setText(isValid ? "✓ 配置正常" : `⚠ ${message}`);
+      })
+      .catch((error) => {
+        statusBarItemEl.setText("⚠ 配置验证失败");
+        console.error("Note Weaver 配置验证失败:", error);
+      });
 
-          // 只有当检查函数返回 true 时，该命令才会在命令面板中显示
-          return true;
-        }
-        return false;
-      },
-    });
+    const statusBarItemEl1 = this.addStatusBarItem();
+    statusBarItemEl1.setText("Note Weaver 已加载");
 
     // 添加一个设置标签页，让用户可以配置插件的各个方面
     this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
-
-    // 如果插件挂载了任何全局 DOM 事件（在不属于此插件的应用部分上）
-    // 使用此函数会在插件禁用时自动移除事件监听器
-    this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-      new Notice("Click");
-    });
-
-    // 注册定时器时，此函数会在插件禁用时自动清除定时器
-    this.registerInterval(
-      window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000),
-    );
   }
 
   onunload() {}
@@ -89,6 +45,74 @@ export default class NoteWeaver extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  /**
+   * 验证插件配置的有效性
+   *
+   * 验证步骤:
+   * 1. 检查 URL 和 API Key 是否可以正常连接到 OpenAI 兼容 API
+   * 2. 检查指定模型是否存在且可用
+   *
+   * @returns [boolean, string] - 返回元组，[0] 表示是否配置有效，[1] 为状态消息
+   *
+   * @example
+   * const [isValid, message] = await this.validateConfig();
+   * if (!isValid) {
+   *   new Notice(`配置无效: ${message}`);
+   * }
+   */
+  private async validateConfig(): Promise<[boolean, string]> {
+    const client = new OpenAI({
+      baseURL: this.settings.baseUrl,
+      apiKey: this.settings.apiKey,
+      dangerouslyAllowBrowser: true,
+    });
+
+    let url_valid = false;
+    let api_key_valid = false;
+    let model_valid = false;
+
+    // 步骤1: 验证 URL 和 API Key
+    try {
+      await client.models.list();
+      url_valid = true;
+      api_key_valid = true;
+    } catch (error) {
+      if (error instanceof OpenAI.APIConnectionError) {
+        return [false, "无法连接到指定URL"];
+      }
+      if (error instanceof OpenAI.AuthenticationError) {
+        url_valid = true; // URL通，但Key错
+        return [false, "API Key 无效"];
+      }
+      // 其他错误也视为连接问题
+      return [
+        false,
+        `连接失败: ${error instanceof Error ? error.message : String(error)}`,
+      ];
+    }
+
+    // 步骤2: 验证模型
+    try {
+      await client.chat.completions.create({
+        model: this.settings.modelName,
+        messages: [{ role: "user", content: "test" }],
+        max_tokens: 1,
+      });
+      model_valid = true;
+      return [true, "所有配置有效"];
+    } catch (error) {
+      if (error instanceof OpenAI.NotFoundError) {
+        return [false, `模型 '${this.settings.modelName}' 不存在`];
+      }
+      return [
+        false,
+        `模型验证失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ];
+    }
   }
 }
 

@@ -2,11 +2,15 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import NoteWeaver from "./main";
 
 export interface NoteWeaverSettings {
-  mySetting: string;
+  apiKey: string;
+  baseUrl: string;
+  modelName: string;
 }
 
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
-  mySetting: "default",
+  apiKey: "",
+  baseUrl: "https://api.deepseek.com/v1",
+  modelName: "deepseek-chat",
 };
 
 export class NoteWeaverSettingTab extends PluginSettingTab {
@@ -23,14 +27,40 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Settings #1")
-      .setDesc("It's a secret")
+      .setName("API Key")
+      .setDesc("用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务")
       .addText((text) =>
         text
-          .setPlaceholder("Enter your secret")
-          .setValue(this.plugin.settings.mySetting)
+          .setPlaceholder("Sk-...")
+          .setValue(this.plugin.settings.apiKey)
           .onChange(async (value) => {
-            this.plugin.settings.mySetting = value;
+            this.plugin.settings.apiKey = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Base URL")
+      .setDesc("API 服务器地址，不同服务商地址不同")
+      .addText((text) =>
+        text
+          .setPlaceholder("https://api.deepseek.com/v1")
+          .setValue(this.plugin.settings.baseUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.baseUrl = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Model")
+      .setDesc("要使用的模型名称，如 gpt-4、claude-3-5-sonnet")
+      .addText((text) =>
+        text
+          .setPlaceholder("deepseek-chat")
+          .setValue(this.plugin.settings.modelName)
+          .onChange(async (value) => {
+            this.plugin.settings.modelName = value;
             await this.plugin.saveSettings();
           })
       );
