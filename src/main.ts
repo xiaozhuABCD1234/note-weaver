@@ -1,99 +1,109 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { App, Editor, MarkdownView, Modal, Notice, Plugin } from "obsidian";
+import {
+  DEFAULT_SETTINGS,
+  NoteWeaverSettings,
+  NoteWeaverSettingTab,
+} from "./settings";
 
-// Remember to rename these classes and interfaces!
+// Remember to rename these class names!
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class NoteWeaver extends Plugin {
+  settings: NoteWeaverSettings;
 
-	async onload() {
-		await this.loadSettings();
+  async onload() {
+    await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
+    // 在左侧功能区创建一个图标
+    this.addRibbonIcon("dice", "Sample", (evt: MouseEvent) => {
+      // 当用户点击图标时调用
+      new Notice("This is a notice!");
+    });
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+    // 添加一个状态栏项到应用底部，在移动端应用中无效
+    const statusBarItemEl = this.addStatusBarItem();
+    statusBarItemEl.setText("Status bar text");
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+    // 添加一个简单的命令，可以在任何地方触发
+    this.addCommand({
+      id: "open-modal-simple",
+      name: "Open modal (simple)",
+      callback: () => {
+        new SampleModal(this.app).open();
+      },
+    });
+    // 添加一个编辑器命令，可以对当前编辑器实例执行一些操作
+    this.addCommand({
+      id: "replace-selected",
+      name: "Replace selected content",
+      editorCallback: (editor: Editor, view: MarkdownView) => {
+        editor.replaceSelection("Sample editor command");
+      },
+    });
+    // 添加一个复杂的命令，可以检查应用的当前状态是否允许执行该命令
+    this.addCommand({
+      id: "open-modal-complex",
+      name: "Open modal (complex)",
+      checkCallback: (checking: boolean) => {
+        // 要检查的条件
+        const markdownView = this.app.workspace.getActiveViewOfType(
+          MarkdownView,
+        );
+        if (markdownView) {
+          // 如果 checking 为 true，我们只是"检查"命令是否可以运行
+          // 如果 checking 为 false，那么我们真的要执行该操作
+          if (!checking) {
+            new SampleModal(this.app).open();
+          }
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
+          // 只有当检查函数返回 true 时，该命令才会在命令面板中显示
+          return true;
+        }
+        return false;
+      },
+    });
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+    // 添加一个设置标签页，让用户可以配置插件的各个方面
+    this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
+    // 如果插件挂载了任何全局 DOM 事件（在不属于此插件的应用部分上）
+    // 使用此函数会在插件禁用时自动移除事件监听器
+    this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+      new Notice("Click");
+    });
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+    // 注册定时器时，此函数会在插件禁用时自动清除定时器
+    this.registerInterval(
+      window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000),
+    );
+  }
 
-	}
+  onunload() {}
 
-	onunload() {
-	}
+  async loadSettings() {
+    this.settings = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      (await this.loadData()) as Partial<NoteWeaverSettings>,
+    );
+  }
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
 }
 
 class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+  constructor(app: App) {
+    super(app);
+  }
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+  onOpen() {
+    let { contentEl } = this;
+    contentEl.setText("Woah!");
+  }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
 }
