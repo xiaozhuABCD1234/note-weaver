@@ -1,10 +1,19 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin } from "obsidian";
+import {
+  App,
+  Editor,
+  MarkdownView,
+  Modal,
+  Notice,
+  Plugin,
+  WorkspaceLeaf,
+} from "obsidian";
 import OpenAI from "openai";
 import {
   DEFAULT_SETTINGS,
   NoteWeaverSettings,
   NoteWeaverSettingTab,
 } from "./settings";
+import { ExampleView, VIEW_TYPE_EXAMPLE } from "./view";
 
 export default class NoteWeaver extends Plugin {
   settings: NoteWeaverSettings;
@@ -31,9 +40,42 @@ export default class NoteWeaver extends Plugin {
 
     // 添加一个设置标签页，让用户可以配置插件的各个方面
     this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
+
+    this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ExampleView(leaf));
+
+    this.addRibbonIcon("bot", "AI 助手", () => {
+      this.activateView();
+    });
   }
 
-  onunload() {}
+  async onunload() {}
+
+  /**
+   * 激活或创建插件视图
+   * 如果视图已存在则切换到该视图，否则创建新视图
+   */
+  async activateView() {
+    // 获取工作区实例
+    const { workspace } = this.app;
+
+    // 定义一个可变的 leaf 变量，用于存储视图所在的页面
+    let leaf: WorkspaceLeaf | null = null;
+
+    // 查找当前已打开的同类型视图
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE);
+
+    // 如果已存在该类型的视图，直接复用
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      // 如果不存在，创建新的侧边栏页面
+      leaf = workspace.getLeaf(false);
+      // 设置视图状态，激活并显示
+      await leaf.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
+    }
+    // 切换到并显示该视图页面
+    workspace.revealLeaf(leaf);
+  }
 
   async loadSettings() {
     this.settings = Object.assign(
