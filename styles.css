@@ -1,8 +1,159 @@
-/*
+/* 聊天容器 */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-primary);
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 
-If your plugin does not need CSS, delete this file.
+/* 消息区域 */
+.messages-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-*/
+/* 消息气泡 */
+.message {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.message-user {
+  align-self: flex-end;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  border-bottom-right-radius: 4px;
+}
+
+.message-assistant {
+  align-self: flex-start;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border-bottom-left-radius: 4px;
+  padding: 10px 14px;
+}
+
+/* Markdown 渲染样式 */
+.message-assistant .markdown-rendered {
+  padding: 0;
+  background: transparent;
+}
+
+.message-assistant .markdown-rendered p {
+  margin: 0 0 8px 0;
+}
+
+.message-assistant .markdown-rendered p:last-child {
+  margin-bottom: 0;
+}
+
+.message-assistant .markdown-rendered code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.message-assistant .markdown-rendered pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-assistant .markdown-rendered pre code {
+  background: transparent;
+  padding: 0;
+  color: #d4d4d4;
+}
+
+.message-assistant .markdown-rendered ul,
+.message-assistant .markdown-rendered ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.message-assistant .markdown-rendered blockquote {
+  border-left: 3px solid var(--interactive-normal);
+  margin: 8px 0;
+  padding-left: 12px;
+  color: var(--text-muted);
+}
+
+.message-assistant .markdown-rendered h1,
+.message-assistant .markdown-rendered h2,
+.message-assistant .markdown-rendered h3 {
+  margin: 12px 0 8px 0;
+}
+
+.message-assistant .markdown-rendered a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.message-assistant .markdown-rendered a:hover {
+  text-decoration: underline;
+}
+
+/* 输入区域 */
+.input-wrapper {
+  display: flex;
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+  background: var(--background-primary);
+}
+
+.input-wrapper input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--text-muted);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.input-wrapper input:focus {
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 2px rgba(var(--text-accent-rgb), 0.2);
+}
+
+.input-wrapper input::placeholder {
+  color: var(--text-faint);
+}
+
+.input-wrapper button {
+  margin-left: 8px;
+  padding: 10px 20px;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.input-wrapper button:hover {
+  background: var(--background-modifier-hover);
+}
+
+.input-wrapper button:disabled {
+  background: var(--background-modifier-form-highlight-bg);
+  cursor: not-allowed;
+}

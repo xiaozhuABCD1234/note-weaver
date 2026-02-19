@@ -1,19 +1,12 @@
-import {
-  App,
-  Editor,
-  MarkdownView,
-  Modal,
-  Notice,
-  Plugin,
-  WorkspaceLeaf,
-} from "obsidian";
+import { Plugin, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
 import {
   DEFAULT_SETTINGS,
   NoteWeaverSettings,
   NoteWeaverSettingTab,
 } from "./settings";
-import { ExampleView, VIEW_TYPE_EXAMPLE } from "./view";
+import { ChatView, VIEW_TYPE_EXAMPLE } from "./view";
+import { ChatMessage, chatStream, createOpenAIClient } from "./api";
 
 export default class NoteWeaver extends Plugin {
   settings: NoteWeaverSettings;
@@ -36,19 +29,20 @@ export default class NoteWeaver extends Plugin {
       });
 
     const statusBarItemEl1 = this.addStatusBarItem();
+    // eslint-disable-next-line obsidianmd/ui/sentence-case
     statusBarItemEl1.setText("Note Weaver 已加载");
 
     // 添加一个设置标签页，让用户可以配置插件的各个方面
     this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
 
-    this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ExampleView(leaf));
+    this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ChatView(leaf, this));
 
-    this.addRibbonIcon("bot", "AI 助手", () => {
-      this.activateView();
+    this.addRibbonIcon("bot", "AI 助手", async () => {
+      await this.activateView();
     });
   }
 
-  async onunload() {}
+  onunload() {}
 
   /**
    * 激活或创建插件视图
@@ -66,15 +60,21 @@ export default class NoteWeaver extends Plugin {
 
     // 如果已存在该类型的视图，直接复用
     if (leaves.length > 0) {
-      leaf = leaves[0];
+      leaf = leaves[0] ?? null;
     } else {
       // 如果不存在，创建新的侧边栏页面
-      leaf = workspace.getLeaf(false);
+      leaf = workspace.getRightLeaf(false);
+      // 检查 leaf 是否成功创建
+      if (!leaf) {
+        return;
+      }
       // 设置视图状态，激活并显示
       await leaf.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
     }
     // 切换到并显示该视图页面
-    workspace.revealLeaf(leaf);
+    if (leaf) {
+      await workspace.revealLeaf(leaf);
+    }
   }
 
   async loadSettings() {
@@ -87,6 +87,15 @@ export default class NoteWeaver extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  getOpenAIClient(): OpenAI {
+    return createOpenAIClient(this.settings.baseUrl, this.settings.apiKey);
+  }
+
+  getChatStream(messages: ChatMessage[]) {
+    const client = this.getOpenAIClient();
+    return chatStream(client, this.settings.modelName, messages);
   }
 
   /**
@@ -111,24 +120,16 @@ export default class NoteWeaver extends Plugin {
       dangerouslyAllowBrowser: true,
     });
 
-    let url_valid = false;
-    let api_key_valid = false;
-    let model_valid = false;
-
     // 步骤1: 验证 URL 和 API Key
     try {
       await client.models.list();
-      url_valid = true;
-      api_key_valid = true;
     } catch (error) {
       if (error instanceof OpenAI.APIConnectionError) {
         return [false, "无法连接到指定URL"];
       }
       if (error instanceof OpenAI.AuthenticationError) {
-        url_valid = true; // URL通，但Key错
         return [false, "API Key 无效"];
       }
-      // 其他错误也视为连接问题
       return [
         false,
         `连接失败: ${error instanceof Error ? error.message : String(error)}`,
@@ -142,7 +143,6 @@ export default class NoteWeaver extends Plugin {
         messages: [{ role: "user", content: "test" }],
         max_tokens: 1,
       });
-      model_valid = true;
       return [true, "所有配置有效"];
     } catch (error) {
       if (error instanceof OpenAI.NotFoundError) {
@@ -155,21 +155,5 @@ export default class NoteWeaver extends Plugin {
         }`,
       ];
     }
-  }
-}
-
-class SampleModal extends Modal {
-  constructor(app: App) {
-    super(app);
-  }
-
-  onOpen() {
-    let { contentEl } = this;
-    contentEl.setText("Woah!");
-  }
-
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
   }
 }
