@@ -43,12 +43,12 @@ export class ChatView extends ItemView {
 		}
 	}
 
-	private buildSystemMessage(): ChatMessage {
+	private async buildSystemMessage(userQuery: string): Promise<ChatMessage> {
 		const note = getActiveNoteContext(this.app);
 		const selection = this.pendingSelection ?? getSelectedText(this.app);
 
 		const sysContent: string[] = [
-			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你具有读取和修改当前笔记的能力。",
+			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你具有读取和修改当前笔记的能力，也可以搜索 Vault 中的其他笔记。",
 			"",
 			"请严格以 JSON 格式输出，格式如下：",
 			"{",
@@ -79,6 +79,18 @@ export class ChatView extends ItemView {
 				selection,
 				"---",
 			);
+		}
+
+		if (this.plugin.settings.rag.enabled && userQuery.trim()) {
+			const ragContext = await this.plugin.ragEngine.getContextForQuery(
+				`${note ? note.file.basename + " " : ""}${userQuery} ${selection ?? ""}`,
+			);
+			if (ragContext) {
+				sysContent.push(
+					"\n从 Vault 中检索到的相关笔记内容：",
+					ragContext,
+				);
+			}
 		}
 
 		return { role: "system", content: sysContent.join("\n") };
@@ -149,7 +161,7 @@ export class ChatView extends ItemView {
 
 		this.previewEl?.empty();
 
-		const systemMessage = this.buildSystemMessage();
+		const systemMessage = await this.buildSystemMessage(content);
 		const apiMessages: ChatMessage[] = [
 			systemMessage,
 			...this.messages,

@@ -1,4 +1,4 @@
-import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
 import {
 	DEFAULT_SETTINGS,
@@ -8,18 +8,42 @@ import {
 import { ChatView, VIEW_TYPE_EXAMPLE } from "./view";
 import { ChatMessage, chatStream, createOpenAIClient } from "./api";
 import { getSelectedText } from "./note-operations";
+import { RagEngine } from "./core/rag/index";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
+	ragEngine!: RagEngine;
 
 	async onload() {
 		await this.loadSettings();
+
+		this.ragEngine = new RagEngine(this.app, this.settings.rag);
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		statusBarItemEl.setText("Note Weaver 已加载");
 
 		this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
+
+		this.registerEvent(
+			this.app.vault.on("create", (file) => {
+				if (!(file instanceof TFile)) return;
+				this.ragEngine.onFileCreated(file);
+			}),
+		);
+
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (!(file instanceof TFile)) return;
+				this.ragEngine.onFileModified(file);
+			}),
+		);
+
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				this.ragEngine.onFileDeleted(file.path);
+			}),
+		);
 
 		this.addCommand({
 			id: "ai-modify-selection",
@@ -39,6 +63,14 @@ export default class NoteWeaver extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "rebuild-rag-index",
+			name: "重建知识索引",
+			callback: async () => {
+				await this.buildRagIndex();
+			},
+		});
+
 		this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ChatView(leaf, this));
 
 		this.addRibbonIcon("bot", "AI 助手", async () => {
@@ -47,6 +79,14 @@ export default class NoteWeaver extends Plugin {
 	}
 
 	onunload() {}
+
+	async buildRagIndex(): Promise<void> {
+		new Notice("正在重建知识索引...");
+		await this.ragEngine.buildIndex(true);
+		new Notice(
+			`知识索引重建完成，已索引 ${this.ragEngine.getIndexedFileCount()} 篇笔记，${this.ragEngine.getChunkCount()} 个片段`,
+		);
+	}
 
 	/**
 	 * 激活或创建插件视图
