@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import NoteWeaver from "./main";
 import { DEFAULT_RAG_CONFIG } from "./core/rag/index";
-import type { RagConfig } from "./core/rag/types";
+import type { FileScope, RagConfig } from "./core/rag/types";
 
 export interface NoteWeaverSettings {
 	apiKey: string;
@@ -187,6 +187,22 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 							this.plugin.settings.rag.chunkOverlap = num;
 							await this.plugin.saveSettings();
 						}
+					}),
+			);
+
+		new Setting(containerEl)
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setName("检索范围")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("限制 AI 助手检索笔记的范围")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("current-folder", "当前文件夹")
+					.addOption("all-vault", "整个 Vault")
+					.setValue(this.plugin.settings.rag.scope)
+					.onChange(async (value: string) => {
+						this.plugin.settings.rag.scope = value as FileScope;
+						await this.plugin.saveSettings();
 					}),
 			);
 

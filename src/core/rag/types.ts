@@ -1,5 +1,7 @@
 import { TFile } from "obsidian";
 
+export type FileScope = "current-folder" | "all-vault";
+
 export interface Chunk {
   content: string;
   filePath: string;
@@ -19,6 +21,7 @@ export interface RagConfig {
   maxChunks: number;
   chunkSize: number;
   chunkOverlap: number;
+  scope: FileScope;
 }
 
 export interface TokenIndex {

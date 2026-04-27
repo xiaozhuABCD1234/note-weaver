@@ -10,6 +10,7 @@ export const DEFAULT_RAG_CONFIG: RagConfig = {
   maxChunks: 5,
   chunkSize: 1000,
   chunkOverlap: 200,
+  scope: "current-folder",
 };
 
 export class RagEngine {
@@ -90,7 +91,19 @@ export class RagEngine {
     const k = topK ?? this.config.maxChunks;
     if (!this.searcher) return [];
 
-    return this.searcher.search(query, k);
+    let results = this.searcher.search(query, k);
+
+    if (this.config.scope === "current-folder") {
+      const folderPath = this.getCurrentFolderPath();
+      if (!folderPath) return [];
+      results = results.filter(
+        (r) =>
+          r.chunk.filePath === folderPath ||
+          r.chunk.filePath.startsWith(folderPath + "/"),
+      );
+    }
+
+    return results;
   }
 
   async getContextForQuery(query: string): Promise<string> {
@@ -192,6 +205,12 @@ export class RagEngine {
     if (this.chunks.length !== before && this.searcher) {
       this.searcher = createSearcher(this.chunks);
     }
+  }
+
+  private getCurrentFolderPath(): string | null {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) return null;
+    return activeFile.parent?.path ?? null;
   }
 
   private async handleFileChange(file: TFile): Promise<void> {
