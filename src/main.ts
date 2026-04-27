@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
 import {
 	DEFAULT_SETTINGS,
@@ -7,6 +7,7 @@ import {
 } from "./settings";
 import { ChatView, VIEW_TYPE_EXAMPLE } from "./view";
 import { ChatMessage, chatStream, createOpenAIClient } from "./api";
+import { getSelectedText } from "./note-operations";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
@@ -19,6 +20,23 @@ export default class NoteWeaver extends Plugin {
 		statusBarItemEl.setText("Note Weaver 已加载");
 
 		this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
+
+		this.addCommand({
+			id: "ai-modify-selection",
+			name: "AI: 修改选中文本",
+			editorCallback: async (editor) => {
+				const selection = editor.getSelection();
+				if (!selection) {
+					new Notice("请先在编辑器中选中要修改的文本");
+					return;
+				}
+				const leaf = await this.activateView();
+				if (leaf?.view instanceof ChatView) {
+					leaf.view.setPendingSelection(selection);
+					new Notice("已读取选中文本，请在 AI 助手中输入修改要求");
+				}
+			},
+		});
 
 		this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ChatView(leaf, this));
 
@@ -33,33 +51,26 @@ export default class NoteWeaver extends Plugin {
 	 * 激活或创建插件视图
 	 * 如果视图已存在则切换到该视图，否则创建新视图
 	 */
-	async activateView() {
-		// 获取工作区实例
+	async activateView(): Promise<WorkspaceLeaf | null> {
 		const { workspace } = this.app;
 
-		// 定义一个可变的 leaf 变量，用于存储视图所在的页面
 		let leaf: WorkspaceLeaf | null = null;
 
-		// 查找当前已打开的同类型视图
 		const leaves = workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE);
 
-		// 如果已存在该类型的视图，直接复用
 		if (leaves.length > 0) {
 			leaf = leaves[0] ?? null;
 		} else {
-			// 如果不存在，创建新的侧边栏页面
 			leaf = workspace.getRightLeaf(false);
-			// 检查 leaf 是否成功创建
 			if (!leaf) {
-				return;
+				return null;
 			}
-			// 设置视图状态，激活并显示
 			await leaf.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
 		}
-		// 切换到并显示该视图页面
 		if (leaf) {
 			await workspace.revealLeaf(leaf);
 		}
+		return leaf;
 	}
 
 	async loadSettings() {
@@ -75,7 +86,18 @@ export default class NoteWeaver extends Plugin {
 	}
 
 	getOpenAIClient(): OpenAI {
-		return createOpenAIClient(this.settings.baseUrl, this.settings.apiKey);
+		return createOpenAIClient(
+			this.settings.baseUrl,
+			this.decodeApiKey(this.settings.apiKey),
+		);
+	}
+
+	private decodeApiKey(encoded: string): string {
+		try {
+			return atob(encoded);
+		} catch {
+			return encoded;
+		}
 	}
 
 	getChatStream(messages: ChatMessage[], signal?: AbortSignal) {
@@ -101,7 +123,7 @@ export default class NoteWeaver extends Plugin {
 	async validateConfig(): Promise<[boolean, string]> {
 		const client = new OpenAI({
 			baseURL: this.settings.baseUrl,
-			apiKey: this.settings.apiKey,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
 			dangerouslyAllowBrowser: true,
 		});
 

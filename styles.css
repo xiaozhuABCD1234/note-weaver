@@ -157,3 +157,96 @@
   background: var(--background-modifier-form-highlight-bg);
   cursor: not-allowed;
 }
+
+/* 修改预览区块 */
+.modification-preview {
+  align-self: flex-start;
+  max-width: 90%;
+  margin: 12px 0;
+  border: 1px solid var(--text-accent);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--background-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.modification-preview-header {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--text-accent);
+  color: var(--text-on-accent);
+}
+
+.modification-preview-body {
+  padding: 12px 14px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.modification-preview-body .markdown-rendered p {
+  margin: 0 0 8px 0;
+}
+
+.modification-preview-body .markdown-rendered p:last-child {
+  margin-bottom: 0;
+}
+
+.modification-preview-body .markdown-rendered code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.modification-preview-body .markdown-rendered pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.modification-preview-body .markdown-rendered pre code {
+  background: transparent;
+  padding: 0;
+  color: #d4d4d4;
+}
+
+.modification-preview-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.mod-preview-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.mod-preview-btn-apply {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.mod-preview-btn-apply:hover {
+  opacity: 0.9;
+}
+
+.mod-preview-btn-reject {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.mod-preview-btn-reject:hover {
+  background: var(--background-modifier-hover);
+}

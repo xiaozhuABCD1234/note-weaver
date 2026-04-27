@@ -9,7 +9,7 @@ export interface NoteWeaverSettings {
 
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	apiKey: "",
-	baseUrl: "https://api.deepseek.com/v1",
+	baseUrl: "https://api.deepseek.com",
 	modelName: "deepseek-v4-flash",
 };
 
@@ -41,7 +41,9 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("API key")
 			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。")
+			.setDesc(
+				"用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。",
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("Sk-...")
@@ -52,7 +54,9 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			)
 			.then((setting) => {
-				const input = setting.descEl.parentElement?.querySelector('input[type="text"]') as HTMLInputElement | null;
+				const input = setting.descEl.parentElement?.querySelector(
+					'input[type="text"]',
+				) as HTMLInputElement | null;
 				if (input) {
 					input.type = "password";
 					input.addEventListener("focus", () => {
@@ -69,7 +73,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			.setDesc("API 服务器地址，不同服务商地址不同")
 			.addText((text) =>
 				text
-					.setPlaceholder("https://api.deepseek.com/v1")
+					.setPlaceholder("https://api.deepseek.com")
 					.setValue(this.plugin.settings.baseUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.baseUrl = value;
@@ -92,6 +96,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		new Setting(containerEl).setDesc("⚠️ API Key 存储在本地插件配置中，请确保 Vault 环境安全。");
+		new Setting(containerEl).setDesc(
+			"API Key 存储在本地插件配置中，请确保 Vault 环境安全。",
+		);
 	}
 }
