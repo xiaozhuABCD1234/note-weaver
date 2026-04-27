@@ -17,6 +17,7 @@ export class ChatView extends ItemView {
 	isLoading = false;
 	private plugin: NoteWeaver;
 	private messagesEl: HTMLElement | null = null;
+	private previewEl: HTMLElement | null = null;
 	private inputEl: HTMLInputElement | null = null;
 	private sendBtnEl: HTMLButtonElement | null = null;
 	private abortController: AbortController | null = null;
@@ -79,6 +80,7 @@ ${MODIFICATION_MARKER_END}
 		const wrapper = container.createDiv("chat-wrapper");
 
 		this.messagesEl = wrapper.createDiv("messages-wrapper");
+		this.previewEl = wrapper.createDiv("modification-preview-wrapper");
 		this.createInputArea(wrapper);
 
 		this.messages = [
@@ -133,6 +135,8 @@ ${MODIFICATION_MARKER_END}
 		this.inputEl.value = "";
 		this.inputEl.placeholder = "输入消息...";
 
+		this.previewEl?.empty();
+
 		const systemMessage = this.buildSystemMessage();
 		const apiMessages: ChatMessage[] = [
 			systemMessage,
@@ -181,7 +185,7 @@ ${MODIFICATION_MARKER_END}
 					)
 					.trim();
 				await this.renderMessages();
-				this.showModificationPreview(modifiedContent);
+				await this.showModificationPreview(modifiedContent);
 			}
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {
@@ -211,10 +215,11 @@ ${MODIFICATION_MARKER_END}
 		return match?.[1]?.trim() ?? null;
 	}
 
-	private showModificationPreview(content: string): void {
-		if (!this.messagesEl) return;
+	private async showModificationPreview(content: string): Promise<void> {
+		if (!this.previewEl) return;
+		this.previewEl.empty();
 
-		const previewContainer = this.messagesEl.createDiv("modification-preview");
+		const previewContainer = this.previewEl.createDiv("modification-preview");
 
 		const header = previewContainer.createDiv(
 			"modification-preview-header",
@@ -222,7 +227,7 @@ ${MODIFICATION_MARKER_END}
 		header.setText("修改预览");
 
 		const body = previewContainer.createDiv("modification-preview-body");
-		void MarkdownRenderer.render(this.app, content, body, "", this);
+		await MarkdownRenderer.render(this.app, content, body, "", this);
 
 		const actions = previewContainer.createDiv("modification-preview-actions");
 
@@ -243,7 +248,7 @@ ${MODIFICATION_MARKER_END}
 				try {
 					await applyModification(note.file, content);
 					new Notice("笔记已更新");
-					previewContainer.remove();
+					this.previewEl?.empty();
 				} catch (e) {
 					new Notice(
 						`修改失败: ${e instanceof Error ? e.message : "未知错误"}`,
@@ -256,13 +261,13 @@ ${MODIFICATION_MARKER_END}
 				const file = await createNewNote(this.app, content);
 				if (file) {
 					new Notice("新笔记已创建");
-					previewContainer.remove();
+					this.previewEl?.empty();
 				}
 			};
 		}
 
 		rejectBtn.onclick = () => {
-			previewContainer.remove();
+			this.previewEl?.empty();
 		};
 
 		this.scrollToBottom();
@@ -323,5 +328,6 @@ ${MODIFICATION_MARKER_END}
 		if (this.escapeHandler) {
 			window.removeEventListener("keydown", this.escapeHandler);
 		}
+		this.previewEl = null;
 	}
 }

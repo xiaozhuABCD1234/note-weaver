@@ -40,8 +40,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("API key")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc(
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				"用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。",
 			)
 			.addText((text) =>
@@ -95,8 +95,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		new Setting(containerEl).setDesc(
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			"API Key 存储在本地插件配置中，请确保 Vault 环境安全。",
 		);
 	}

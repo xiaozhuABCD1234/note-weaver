@@ -32,6 +32,7 @@ export default class NoteWeaver extends Plugin {
 				}
 				const leaf = await this.activateView();
 				if (leaf?.view instanceof ChatView) {
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 					leaf.view.setPendingSelection(selection);
 					new Notice("已读取选中文本，请在 AI 助手中输入修改要求");
 				}
