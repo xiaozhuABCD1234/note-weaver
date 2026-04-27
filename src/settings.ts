@@ -5,12 +5,14 @@ export interface NoteWeaverSettings {
 	apiKey: string;
 	baseUrl: string;
 	modelName: string;
+	maxTokens: number;
 }
 
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	apiKey: "",
 	baseUrl: "https://api.deepseek.com",
 	modelName: "deepseek-v4-flash",
+	maxTokens: 4096,
 };
 
 export class NoteWeaverSettingTab extends PluginSettingTab {
@@ -92,6 +94,22 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.modelName = value;
 						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max Tokens")
+			.setDesc("每次请求的最大 Token 数，防止 JSON 被截断")
+			.addText((text) =>
+				text
+					.setPlaceholder("4096")
+					.setValue(String(this.plugin.settings.maxTokens))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num > 0) {
+							this.plugin.settings.maxTokens = num;
+							await this.plugin.saveSettings();
+						}
 					}),
 			);
 

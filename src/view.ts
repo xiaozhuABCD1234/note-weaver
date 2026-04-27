@@ -1,13 +1,11 @@
 import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
 import NoteWeaver from "./main";
-import { ChatMessage } from "./api";
+import { ChatMessage, AiJsonResponse } from "./api";
 import {
 	getActiveNoteContext,
 	getSelectedText,
 	applyModification,
 	createNewNote,
-	MODIFICATION_MARKER_START,
-	MODIFICATION_MARKER_END,
 } from "./note-operations";
 
 export const VIEW_TYPE_EXAMPLE = "example-view";
@@ -49,27 +47,41 @@ export class ChatView extends ItemView {
 		const note = getActiveNoteContext(this.app);
 		const selection = this.pendingSelection ?? getSelectedText(this.app);
 
-		let systemContent =
-			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你具有读取和修改当前笔记的能力。";
+		const sysContent: string[] = [
+			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你具有读取和修改当前笔记的能力。",
+			"",
+			"请严格以 JSON 格式输出，格式如下：",
+			"{",
+			'  "reply": "你对用户问题的文字回复",',
+			'  "modified_note": "如果用户要求修改笔记，此处放修改后的完整笔记内容"',
+			"}",
+			"",
+			"规则：",
+			'- "reply" 字段始终存在',
+			'- 仅当用户明确要求修改笔记内容时，才包含 "modified_note" 字段',
+			'- "modified_note" 必须是笔记的完整内容',
+		];
 
 		if (note) {
-			systemContent += `\n\n当前打开的笔记为：「${note.file.basename}」\n笔记完整内容：\n---\n${note.content}\n---`;
+			sysContent.push(
+				`\n当前打开的笔记为：「${note.file.basename}」`,
+				"笔记完整内容：",
+				"---",
+				note.content,
+				"---",
+			);
 		}
 
 		if (selection) {
-			systemContent += `\n\n用户的选中文本：\n---\n${selection}\n---`;
+			sysContent.push(
+				"\n用户的选中文本：",
+				"---",
+				selection,
+				"---",
+			);
 		}
 
-		systemContent += `\n\n当用户要求你修改笔记时，请遵循以下规则：
-1. 阅读并理解当前笔记/选中文本的内容
-2. 根据用户要求进行修改
-3. 将**修改后的完整内容**（整篇笔记或相关部分）包裹在以下标记中：
-${MODIFICATION_MARKER_START}
-[修改后的内容]
-${MODIFICATION_MARKER_END}
-4. 在标记之外，简要说明你做了哪些修改`;
-
-		return { role: "system", content: systemContent };
+		return { role: "system", content: sysContent.join("\n") };
 	}
 
 	protected async onOpen(): Promise<void> {
@@ -168,24 +180,33 @@ ${MODIFICATION_MARKER_END}
 				selection ? apiMessages : apiMessages,
 				this.abortController.signal,
 			);
+
+			let rawJsonBuffer = "";
+			let lastRenderedReply = "";
+
 			for await (const chunk of stream) {
-				aiMessage.content += chunk;
-				await this.renderMessages();
-				this.scrollToBottom();
+				rawJsonBuffer += chunk;
+
+				const partialReply = this.extractPartialReply(rawJsonBuffer);
+				if (partialReply && partialReply !== lastRenderedReply) {
+					lastRenderedReply = partialReply;
+					aiMessage.content = partialReply;
+					await this.renderMessages();
+					this.scrollToBottom();
+				}
 			}
 
-			const modifiedContent = this.extractModifiedContent(aiMessage.content);
-			if (modifiedContent) {
-				aiMessage.content = aiMessage.content
-					.replace(
-						new RegExp(
-							`${MODIFICATION_MARKER_START}[\\s\\S]*?${MODIFICATION_MARKER_END}`,
-						),
-						"",
-					)
-					.trim();
+			try {
+				const parsed = JSON.parse(rawJsonBuffer) as AiJsonResponse;
+				aiMessage.content = parsed.reply;
 				await this.renderMessages();
-				await this.showModificationPreview(modifiedContent);
+				if (parsed.modified_note) {
+					await this.showModificationPreview(parsed.modified_note);
+				}
+			} catch {
+				new Notice("AI 返回的 JSON 格式异常，已显示原始内容");
+				aiMessage.content = rawJsonBuffer;
+				await this.renderMessages();
 			}
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {
@@ -207,12 +228,9 @@ ${MODIFICATION_MARKER_END}
 		}
 	}
 
-	private extractModifiedContent(text: string): string | null {
-		const pattern = new RegExp(
-			`${MODIFICATION_MARKER_START}\\s*([\\s\\S]*?)\\s*${MODIFICATION_MARKER_END}`,
-		);
-		const match = text.match(pattern);
-		return match?.[1]?.trim() ?? null;
+	private extractPartialReply(buffer: string): string {
+		const match = buffer.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+		return match?.[1] ?? "";
 	}
 
 	private async showModificationPreview(content: string): Promise<void> {
@@ -292,18 +310,10 @@ ${MODIFICATION_MARKER_END}
 			);
 
 			if (msg.role === "assistant") {
-				const displayContent = msg.content.includes(MODIFICATION_MARKER_START)
-					? msg.content.replace(
-							new RegExp(
-								`${MODIFICATION_MARKER_START}[\\s\\S]*?${MODIFICATION_MARKER_END}`,
-							),
-							"",
-					  ).trim() || ""
-					: msg.content;
-				if (displayContent) {
+				if (msg.content) {
 					await MarkdownRenderer.render(
 						this.app,
-						displayContent,
+						msg.content,
 						bubble,
 						"",
 						this,

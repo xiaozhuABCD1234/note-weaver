@@ -5,6 +5,11 @@ export interface ChatMessage {
 	content: string;
 }
 
+export interface AiJsonResponse {
+	reply: string;
+	modified_note?: string;
+}
+
 export function createOpenAIClient(baseUrl: string, apiKey: string): OpenAI {
 	return new OpenAI({
 		baseURL: baseUrl,
@@ -17,6 +22,7 @@ export async function* chatStream(
 	client: OpenAI,
 	model: string,
 	messages: ChatMessage[],
+	maxTokens?: number,
 	signal?: AbortSignal,
 ) {
 	const stream = await client.chat.completions.create(
@@ -24,6 +30,8 @@ export async function* chatStream(
 			model,
 			messages,
 			stream: true,
+			response_format: { type: "json_object" },
+			max_tokens: maxTokens,
 		},
 		{ signal },
 	);

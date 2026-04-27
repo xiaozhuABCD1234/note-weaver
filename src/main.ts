@@ -103,7 +103,7 @@ export default class NoteWeaver extends Plugin {
 
 	getChatStream(messages: ChatMessage[], signal?: AbortSignal) {
 		const client = this.getOpenAIClient();
-		return chatStream(client, this.settings.modelName, messages, signal);
+		return chatStream(client, this.settings.modelName, messages, this.settings.maxTokens, signal);
 	}
 
 	/**
@@ -148,7 +148,8 @@ export default class NoteWeaver extends Plugin {
 		try {
 			await client.chat.completions.create({
 				model: this.settings.modelName,
-				messages: [{ role: "user", content: "test" }],
+				messages: [{ role: "user", content: "test json" }],
+				response_format: { type: "json_object" },
 				max_tokens: 1,
 			});
 			return [true, "所有配置有效"];
