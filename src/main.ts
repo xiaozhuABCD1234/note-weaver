@@ -5,7 +5,7 @@ import {
 	NoteWeaverSettings,
 	NoteWeaverSettingTab,
 } from "./settings";
-import { ChatView, VIEW_TYPE_EXAMPLE } from "./view";
+import { ChatView, VIEW_TYPE_CHAT } from "./view";
 import { ChatMessage, chatStream, createOpenAIClient } from "./api";
 import { getSelectedText } from "./note-operations";
 import { RagEngine } from "./core/rag/index";
@@ -71,7 +71,7 @@ export default class NoteWeaver extends Plugin {
 			},
 		});
 
-		this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ChatView(leaf, this));
+		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
 		this.addRibbonIcon("bot", "AI 助手", async () => {
 			await this.activateView();
@@ -97,7 +97,7 @@ export default class NoteWeaver extends Plugin {
 
 		let leaf: WorkspaceLeaf | null = null;
 
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE);
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 
 		if (leaves.length > 0) {
 			leaf = leaves[0] ?? null;
@@ -106,7 +106,7 @@ export default class NoteWeaver extends Plugin {
 			if (!leaf) {
 				return null;
 			}
-			await leaf.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
+			await leaf.setViewState({ type: VIEW_TYPE_CHAT, active: true });
 		}
 		if (leaf) {
 			await workspace.revealLeaf(leaf);

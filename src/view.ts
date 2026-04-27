@@ -8,7 +8,7 @@ import {
 	createNewNote,
 } from "./note-operations";
 
-export const VIEW_TYPE_EXAMPLE = "example-view";
+export const VIEW_TYPE_CHAT = "note-weaver-chat";
 
 export class ChatView extends ItemView {
 	messages: ChatMessage[] = [];
@@ -28,7 +28,7 @@ export class ChatView extends ItemView {
 	}
 
 	getViewType(): string {
-		return VIEW_TYPE_EXAMPLE;
+		return VIEW_TYPE_CHAT;
 	}
 
 	getDisplayText(): string {

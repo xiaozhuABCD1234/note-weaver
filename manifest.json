@@ -3,9 +3,8 @@
   "name": "Note Weaver",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
-  "description": "Demonstrates some of the capabilities of the Obsidian API.",
-  "author": "Obsidian",
-  "authorUrl": "https://obsidian.md",
-  "fundingUrl": "https://obsidian.md/pricing",
+  "description": "AI 驱动的 Obsidian 笔记助手，支持智能问答、笔记修改和知识检索 (RAG)",
+  "author": "xiaozhu",
+  "authorUrl": "https://github.com/xiaozhuABCD1234",
   "isDesktopOnly": false
 }
