@@ -10,7 +10,7 @@ export interface NoteWeaverSettings {
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	apiKey: "",
 	baseUrl: "https://api.deepseek.com/v1",
-	modelName: "deepseek-chat",
+	modelName: "deepseek-v4-flash",
 };
 
 export class NoteWeaverSettingTab extends PluginSettingTab {
@@ -39,7 +39,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName("API Key")
+			.setName("API key")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc("用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。")
 			.addText((text) =>
 				text
@@ -81,7 +82,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			.setDesc("要使用的模型名称，如 gpt-4、claude-3-5-sonnet")
 			.addText((text) =>
 				text
-					.setPlaceholder("deepseek-chat")
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("deepseek-v4-flash")
 					.setValue(this.plugin.settings.modelName)
 					.onChange(async (value) => {
 						this.plugin.settings.modelName = value;
@@ -89,6 +91,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		new Setting(containerEl).setDesc("⚠️ API Key 存储在本地插件配置中，请确保 Vault 环境安全。");
 	}
 }

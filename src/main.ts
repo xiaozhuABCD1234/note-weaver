@@ -15,6 +15,7 @@ export default class NoteWeaver extends Plugin {
 		await this.loadSettings();
 
 		const statusBarItemEl = this.addStatusBarItem();
+		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		statusBarItemEl.setText("Note Weaver 已加载");
 
 		this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
