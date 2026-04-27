@@ -10,29 +10,13 @@ import { ChatMessage, chatStream, createOpenAIClient } from "./api";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
-	client!: OpenAI;
 
 	async onload() {
 		await this.loadSettings();
 
-		// 添加一个状态栏项到应用底部，在移动端应用中无效
 		const statusBarItemEl = this.addStatusBarItem();
+		statusBarItemEl.setText("Note Weaver 已加载");
 
-		// 异步验证配置，不阻塞插件加载
-		this.validateConfig()
-			.then(([isValid, message]) => {
-				statusBarItemEl.setText(isValid ? "✓ 配置正常" : `⚠ ${message}`);
-			})
-			.catch((error) => {
-				statusBarItemEl.setText("⚠ 配置验证失败");
-				console.error("Note Weaver 配置验证失败:", error);
-			});
-
-		const statusBarItemEl1 = this.addStatusBarItem();
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		statusBarItemEl1.setText("Note Weaver 已加载");
-
-		// 添加一个设置标签页，让用户可以配置插件的各个方面
 		this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
 
 		this.registerView(VIEW_TYPE_EXAMPLE, (leaf) => new ChatView(leaf, this));
@@ -93,9 +77,9 @@ export default class NoteWeaver extends Plugin {
 		return createOpenAIClient(this.settings.baseUrl, this.settings.apiKey);
 	}
 
-	getChatStream(messages: ChatMessage[]) {
+	getChatStream(messages: ChatMessage[], signal?: AbortSignal) {
 		const client = this.getOpenAIClient();
-		return chatStream(client, this.settings.modelName, messages);
+		return chatStream(client, this.settings.modelName, messages, signal);
 	}
 
 	/**
@@ -113,7 +97,7 @@ export default class NoteWeaver extends Plugin {
 	 *   new Notice(`配置无效: ${message}`);
 	 * }
 	 */
-	private async validateConfig(): Promise<[boolean, string]> {
+	async validateConfig(): Promise<[boolean, string]> {
 		const client = new OpenAI({
 			baseURL: this.settings.baseUrl,
 			apiKey: this.settings.apiKey,

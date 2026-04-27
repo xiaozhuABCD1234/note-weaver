@@ -11,6 +11,8 @@ export class ChatView extends ItemView {
 	private messagesEl: HTMLElement | null = null;
 	private inputEl: HTMLInputElement | null = null;
 	private sendBtnEl: HTMLButtonElement | null = null;
+	private abortController: AbortController | null = null;
+	private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: NoteWeaver) {
 		super(leaf);
@@ -76,6 +78,11 @@ export class ChatView extends ItemView {
 		const content = this.inputEl.value.trim();
 		if (!content || this.isLoading) return;
 
+		if (!this.plugin.settings.apiKey) {
+			new Notice("请先在设置中配置 API Key");
+			return;
+		}
+
 		this.inputEl.value = "";
 		this.messages.push({ role: "user", content });
 		await this.renderMessages();
@@ -83,6 +90,15 @@ export class ChatView extends ItemView {
 
 		this.isLoading = true;
 		this.updateInputState();
+
+		this.abortController = new AbortController();
+
+		this.escapeHandler = (e: KeyboardEvent) => {
+			if (e.key === "Escape" && this.isLoading) {
+				this.abortController?.abort();
+			}
+		};
+		window.addEventListener("keydown", this.escapeHandler);
 
 		const aiMessage: ChatMessage = { role: "assistant", content: "" };
 		this.messages.push(aiMessage);
@@ -95,13 +111,22 @@ export class ChatView extends ItemView {
 				this.scrollToBottom();
 			}
 		} catch (error) {
-			aiMessage.content = `错误: ${
-				error instanceof Error ? error.message : "未知错误"
-			}`;
-			new Notice("AI 响应失败，请检查配置");
+			if (error instanceof Error && error.name === "AbortError") {
+				aiMessage.content += "\n[已取消]";
+			} else {
+				aiMessage.content = `错误: ${
+					error instanceof Error ? error.message : "未知错误"
+				}`;
+				new Notice("AI 响应失败，请检查配置");
+			}
 		} finally {
 			this.isLoading = false;
 			this.updateInputState();
+			this.abortController = null;
+			if (this.escapeHandler) {
+				window.removeEventListener("keydown", this.escapeHandler);
+				this.escapeHandler = null;
+			}
 		}
 	}
 
@@ -109,7 +134,7 @@ export class ChatView extends ItemView {
 		if (this.inputEl && this.sendBtnEl) {
 			this.inputEl.disabled = this.isLoading;
 			this.sendBtnEl.disabled = this.isLoading;
-			this.sendBtnEl.textContent = this.isLoading ? "..." : "发送";
+			this.sendBtnEl.textContent = this.isLoading ? "取消" : "发送";
 		}
 	}
 
@@ -138,6 +163,11 @@ export class ChatView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
-		// Nothing to clean up
+		if (this.abortController) {
+			this.abortController.abort();
+		}
+		if (this.escapeHandler) {
+			window.removeEventListener("keydown", this.escapeHandler);
+		}
 	}
 }

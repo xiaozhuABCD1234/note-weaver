@@ -17,12 +17,16 @@ export async function* chatStream(
 	client: OpenAI,
 	model: string,
 	messages: ChatMessage[],
+	signal?: AbortSignal,
 ) {
-	const stream = await client.chat.completions.create({
-		model,
-		messages,
-		stream: true,
-	});
+	const stream = await client.chat.completions.create(
+		{
+			model,
+			messages,
+			stream: true,
+		},
+		{ signal },
+	);
 
 	for await (const chunk of stream) {
 		const content = chunk.choices[0]?.delta?.content;
