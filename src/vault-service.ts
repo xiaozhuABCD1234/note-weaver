@@ -87,14 +87,18 @@ export class VaultService {
 	}
 
 	async searchContent(query: string): Promise<Array<{ path: string; snippet: string }>> {
+		const files = this.app.vault.getMarkdownFiles();
+		const contents = await Promise.all(files.map(f => this.app.vault.cachedRead(f)));
+		const q = query.toLowerCase();
 		const results: Array<{ path: string; snippet: string }> = [];
-		for (const file of this.app.vault.getMarkdownFiles()) {
-			const content = await this.app.vault.cachedRead(file);
-			const idx = content.toLowerCase().indexOf(query.toLowerCase());
+		for (let i = 0; i < files.length; i++) {
+			const content = contents[i];
+			if (!content) continue;
+			const idx = content.toLowerCase().indexOf(q);
 			if (idx !== -1) {
 				const start = Math.max(0, idx - 100);
 				const end = Math.min(content.length, idx + query.length + 100);
-				results.push({ path: file.path, snippet: content.slice(start, end) });
+				results.push({ path: files[i]!.path, snippet: content.slice(start, end) });
 			}
 		}
 		return results;

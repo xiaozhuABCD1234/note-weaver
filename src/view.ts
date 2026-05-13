@@ -18,7 +18,7 @@ export class ChatView extends ItemView {
 	private plugin: NoteWeaver;
 	private messagesEl: HTMLElement | null = null;
 	private previewEl: HTMLElement | null = null;
-	private inputEl: HTMLInputElement | null = null;
+	private inputEl: HTMLTextAreaElement | null = null;
 	private sendBtnEl: HTMLButtonElement | null = null;
 	private abortController: AbortController | null = null;
 	private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -126,8 +126,7 @@ export class ChatView extends ItemView {
 	private createInputArea(parent: HTMLElement): HTMLElement {
 		const inputArea = parent.createDiv("input-wrapper");
 
-		this.inputEl = inputArea.createEl("input", {
-			type: "text",
+		this.inputEl = inputArea.createEl("textarea", {
 			placeholder: "输入消息...",
 		});
 

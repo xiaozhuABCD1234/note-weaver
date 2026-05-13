@@ -118,7 +118,7 @@
   background: var(--background-primary);
 }
 
-.input-wrapper input {
+.input-wrapper textarea {
   flex: 1;
   padding: 10px 14px;
   border: 1px solid var(--text-muted);
@@ -127,14 +127,19 @@
   outline: none;
   background: var(--background-primary);
   color: var(--text-normal);
+  resize: vertical;
+  min-height: 36px;
+  max-height: 200px;
+  font-family: inherit;
+  line-height: 1.5;
 }
 
-.input-wrapper input:focus {
+.input-wrapper textarea:focus {
   border-color: var(--text-accent);
   box-shadow: 0 0 0 2px rgba(var(--text-accent-rgb), 0.2);
 }
 
-.input-wrapper input::placeholder {
+.input-wrapper textarea::placeholder {
   color: var(--text-faint);
 }
 
