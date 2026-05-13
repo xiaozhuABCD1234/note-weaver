@@ -1,9 +1,10 @@
 import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
-import NoteWeaver from "./main";
 import {
 	ApiMessage,
 	ChatMessage,
+	StreamEvent,
 	ToolCall,
+	ToolResultMessage,
 } from "./api";
 import {
 	getActiveNoteContext,
@@ -12,10 +13,37 @@ import {
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";
 
+export interface ChatDeps {
+	getChatStreamWithTools(
+		messages: ApiMessage[],
+		signal?: AbortSignal,
+	): AsyncGenerator<StreamEvent>;
+	vaultService: {
+		executeToolCalls(calls: ToolCall[]): Promise<ToolResultMessage[]>;
+		readonly lastWritePath: string | null;
+		readonly lastWriteContent: string | null;
+	};
+	ragEngine: {
+		getContextForQuery(query: string): Promise<string>;
+	};
+	readonly settings: {
+		apiKey: string;
+		rag: { enabled: boolean };
+	};
+	logger: {
+		log(entry: {
+			level: string;
+			type: string;
+			message: string;
+			data?: Record<string, unknown>;
+		}): void;
+	};
+}
+
 export class ChatView extends ItemView {
 	messages: ApiMessage[] = [];
 	isLoading = false;
-	private plugin: NoteWeaver;
+	private deps: ChatDeps;
 	private messagesEl: HTMLElement | null = null;
 	private previewEl: HTMLElement | null = null;
 	private inputEl: HTMLTextAreaElement | null = null;
@@ -25,13 +53,17 @@ export class ChatView extends ItemView {
 	private pendingSelection: string | null = null;
 	private maxToolRounds = 10;
 
-	constructor(leaf: WorkspaceLeaf, plugin: NoteWeaver) {
+	constructor(leaf: WorkspaceLeaf, deps: ChatDeps) {
 		super(leaf);
-		this.plugin = plugin;
+		this.deps = deps;
 	}
 
 	getViewType(): string {
 		return VIEW_TYPE_CHAT;
+	}
+
+	getIcon(): string {
+		return "bot";
 	}
 
 	getDisplayText(): string {
@@ -88,8 +120,8 @@ export class ChatView extends ItemView {
 			);
 		}
 
-		if (this.plugin.settings.rag.enabled && userQuery.trim()) {
-			const ragContext = await this.plugin.ragEngine.getContextForQuery(
+		if (this.deps.settings.rag.enabled && userQuery.trim()) {
+			const ragContext = await this.deps.ragEngine.getContextForQuery(
 				`${note ? note.file.basename + " " : ""}${userQuery} ${selection ?? ""}`,
 			);
 			if (ragContext) {
@@ -154,7 +186,7 @@ export class ChatView extends ItemView {
 		const content = this.inputEl.value.trim();
 		if (!content || this.isLoading) return;
 
-		if (!this.plugin.settings.apiKey) {
+		if (!this.deps.settings.apiKey) {
 			new Notice("请先在设置中配置 API key");
 			return;
 		}
@@ -187,7 +219,7 @@ export class ChatView extends ItemView {
 		};
 		window.addEventListener("keydown", this.escapeHandler);
 
-		this.plugin.logger.log({
+		this.deps.logger.log({
 			level: "info",
 			type: "chat",
 			message: `用户发送消息`,
@@ -207,7 +239,7 @@ export class ChatView extends ItemView {
 			let toolRounds = 0;
 
 			while (toolRounds < this.maxToolRounds) {
-				const stream = this.plugin.getChatStreamWithTools(
+				const stream = this.deps.getChatStreamWithTools(
 					currentMessages,
 					this.abortController.signal,
 				);
@@ -233,16 +265,16 @@ export class ChatView extends ItemView {
 					const toolNames = toolCalls.map(tc => tc.function.name).join(", ");
 					new Notice(`🤖 AI 正在执行: ${toolNames}`);
 
-					this.plugin.logger.log({
+					this.deps.logger.log({
 						level: "info",
 						type: "tool",
 						message: `AI 调用工具: ${toolNames}`,
 						data: { toolCalls: toolCalls.map(tc => ({ name: tc.function.name, args: tc.function.arguments })) },
 					});
 
-					const results = await this.plugin.vaultService.executeToolCalls(toolCalls);
+					const results = await this.deps.vaultService.executeToolCalls(toolCalls);
 
-					this.plugin.logger.log({
+					this.deps.logger.log({
 						level: "info",
 						type: "tool",
 						message: `工具调用完成: ${toolNames}`,
@@ -255,10 +287,10 @@ export class ChatView extends ItemView {
 						...results,
 					];
 
-					if (this.plugin.vaultService.lastWriteContent) {
+					if (this.deps.vaultService.lastWriteContent) {
 						await this.showWritePreview(
-							this.plugin.vaultService.lastWritePath ?? "",
-							this.plugin.vaultService.lastWriteContent,
+							this.deps.vaultService.lastWritePath ?? "",
+							this.deps.vaultService.lastWriteContent,
 						);
 					}
 
@@ -277,7 +309,7 @@ export class ChatView extends ItemView {
 			aiMessage.content = fullReply;
 			await this.renderMessages();
 
-			this.plugin.logger.log({
+			this.deps.logger.log({
 				level: "info",
 				type: "chat",
 				message: `AI 回复完成`,
@@ -290,7 +322,7 @@ export class ChatView extends ItemView {
 				} else {
 					aiMessage.content = "*[已取消]*";
 				}
-				this.plugin.logger.log({
+				this.deps.logger.log({
 					level: "warn",
 					type: "chat",
 					message: "用户取消了 AI 回复",
@@ -300,7 +332,7 @@ export class ChatView extends ItemView {
 					error instanceof Error ? error.message : "未知错误"
 				}`;
 				new Notice("AI 响应失败，请检查配置");
-				this.plugin.logger.log({
+				this.deps.logger.log({
 					level: "error",
 					type: "api",
 					message: `AI 响应失败: ${error instanceof Error ? error.message : "未知错误"}`,

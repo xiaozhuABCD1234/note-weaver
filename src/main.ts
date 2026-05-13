@@ -109,7 +109,13 @@ export default class NoteWeaver extends Plugin {
 			},
 		});
 
-		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
+		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, {
+			getChatStreamWithTools: this.getChatStreamWithTools.bind(this),
+			vaultService: this.vaultService,
+			ragEngine: this.ragEngine,
+			settings: this.settings,
+			logger: this.logger,
+		}));
 
 		this.addRibbonIcon("bot", "AI 助手", async () => {
 			await this.activateView();
