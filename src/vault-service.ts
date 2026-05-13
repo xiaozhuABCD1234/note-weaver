@@ -1,4 +1,5 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
+import { AgentLogger } from "./core/logger/index";
 
 export interface ToolCall {
 	id: string;
@@ -34,8 +35,11 @@ export interface VaultListing {
 export class VaultService {
 	lastWritePath: string | null = null;
 	lastWriteContent: string | null = null;
+	private logger: AgentLogger;
 
-	constructor(private app: App) {}
+	constructor(private app: App, logger: AgentLogger) {
+		this.logger = logger;
+	}
 
 	async readNote(path: string): Promise<string> {
 		return await this.app.vault.read(this.getFile(path));
@@ -132,28 +136,53 @@ export class VaultService {
 	async executeToolCall(call: ToolCall): Promise<string> {
 		const args = JSON.parse(call.function.arguments) as Record<string, unknown>;
 		try {
+			let result: string;
 			switch (call.function.name) {
 				case "read_note":
-					return await this.readNote(args.path as string);
+					result = await this.readNote(args.path as string);
+					break;
 				case "write_note":
-					return await this.writeNote(args.path as string, args.content as string);
+					result = await this.writeNote(args.path as string, args.content as string);
+					break;
 				case "append_note":
-					return await this.appendNote(args.path as string, args.content as string);
+					result = await this.appendNote(args.path as string, args.content as string);
+					break;
 				case "delete_note":
-					return await this.deleteNote(args.path as string);
+					result = await this.deleteNote(args.path as string);
+					break;
 				case "rename_note":
-					return await this.renameNote(args.path as string, args.newPath as string);
+					result = await this.renameNote(args.path as string, args.newPath as string);
+					break;
 				case "search_notes":
-					return JSON.stringify(this.searchFiles(args.query as string));
+					result = JSON.stringify(this.searchFiles(args.query as string));
+					break;
 				case "search_content":
-					return JSON.stringify(await this.searchContent(args.query as string));
+					result = JSON.stringify(await this.searchContent(args.query as string));
+					break;
 				case "list_folder":
-					return JSON.stringify(this.listFolder(args.path as string | undefined));
+					result = JSON.stringify(this.listFolder(args.path as string | undefined));
+					break;
 				default:
 					throw new Error(`Unknown tool: ${call.function.name}`);
 			}
+
+			this.logger.log({
+				level: "info",
+				type: "tool",
+				message: `工具执行: ${call.function.name}`,
+				data: { arguments: args, resultLength: result.length },
+			});
+
+			return result;
 		} catch (e) {
-			return `Error: ${e instanceof Error ? e.message : String(e)}`;
+			const errMsg = `Error: ${e instanceof Error ? e.message : String(e)}`;
+			this.logger.log({
+				level: "error",
+				type: "tool",
+				message: `工具执行失败: ${call.function.name}`,
+				data: { arguments: args, error: errMsg },
+			});
+			return errMsg;
 		}
 	}
 

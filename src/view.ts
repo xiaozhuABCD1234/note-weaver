@@ -196,6 +196,13 @@ export class ChatView extends ItemView {
 		};
 		window.addEventListener("keydown", this.escapeHandler);
 
+		this.plugin.logger.log({
+			level: "info",
+			type: "chat",
+			message: `用户发送消息`,
+			data: { content: content, hasSelection: !!selection },
+		});
+
 		const aiMessage: ViewMessage = { role: "assistant", content: "" };
 		this.messages.push(aiMessage);
 
@@ -216,6 +223,7 @@ export class ChatView extends ItemView {
 
 				let toolCalls: ToolCall[] | null = null;
 				let streamedContent = "";
+				let reasoningContent = "";
 
 				for await (const event of stream) {
 					if (event.type === "content") {
@@ -226,6 +234,7 @@ export class ChatView extends ItemView {
 						this.scrollToBottom();
 					} else if (event.type === "tool_calls") {
 						toolCalls = event.calls;
+						reasoningContent = event.reasoningContent;
 					}
 				}
 
@@ -233,11 +242,25 @@ export class ChatView extends ItemView {
 					const toolNames = toolCalls.map(tc => tc.function.name).join(", ");
 					new Notice(`🤖 AI 正在执行: ${toolNames}`);
 
+					this.plugin.logger.log({
+						level: "info",
+						type: "tool",
+						message: `AI 调用工具: ${toolNames}`,
+						data: { toolCalls: toolCalls.map(tc => ({ name: tc.function.name, args: tc.function.arguments })) },
+					});
+
 					const results = await this.plugin.vaultService.executeToolCalls(toolCalls);
+
+					this.plugin.logger.log({
+						level: "info",
+						type: "tool",
+						message: `工具调用完成: ${toolNames}`,
+						data: { resultCount: results.length },
+					});
 
 					currentMessages = [
 						...currentMessages,
-						{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls },
+						{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls, reasoning_content: reasoningContent || null },
 						...results,
 					];
 
@@ -262,6 +285,13 @@ export class ChatView extends ItemView {
 
 			aiMessage.content = fullReply;
 			await this.renderMessages();
+
+			this.plugin.logger.log({
+				level: "info",
+				type: "chat",
+				message: `AI 回复完成`,
+				data: { replyLength: fullReply.length, toolRounds },
+			});
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {
 				if (aiMessage.content) {
@@ -269,11 +299,21 @@ export class ChatView extends ItemView {
 				} else {
 					aiMessage.content = "*[已取消]*";
 				}
+				this.plugin.logger.log({
+					level: "warn",
+					type: "chat",
+					message: "用户取消了 AI 回复",
+				});
 			} else {
 				aiMessage.content = `错误: ${
 					error instanceof Error ? error.message : "未知错误"
 				}`;
 				new Notice("AI 响应失败，请检查配置");
+				this.plugin.logger.log({
+					level: "error",
+					type: "api",
+					message: `AI 响应失败: ${error instanceof Error ? error.message : "未知错误"}`,
+				});
 			}
 		} finally {
 			this.isLoading = false;

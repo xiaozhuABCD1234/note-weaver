@@ -2,6 +2,7 @@ import { App, TFile, TFolder, Notice } from "obsidian";
 import { Chunk, RagConfig, SearchResult } from "./types";
 import { chunkText } from "./chunker";
 import { createSearcher } from "./searcher";
+import { AgentLogger } from "../logger/index";
 
 export type { RagConfig } from "./types";
 
@@ -20,10 +21,12 @@ export class RagEngine {
   private searcher: ReturnType<typeof createSearcher> | null = null;
   private indexBuilt = false;
   private building = false;
+  private logger: AgentLogger;
 
-  constructor(app: App, config: RagConfig) {
+  constructor(app: App, config: RagConfig, logger: AgentLogger) {
     this.app = app;
     this.config = config;
+    this.logger = logger;
   }
 
   updateConfig(config: Partial<RagConfig>): void {
@@ -62,6 +65,13 @@ export class RagEngine {
       this.chunks = allChunks;
       this.searcher = createSearcher(this.chunks);
       this.indexBuilt = true;
+
+      this.logger.log({
+        level: "info",
+        type: "rag",
+        message: `RAG 索引构建完成`,
+        data: { fileCount: markdownFiles.length, chunkCount: allChunks.length },
+      });
     } finally {
       this.building = false;
     }
@@ -102,6 +112,18 @@ export class RagEngine {
           r.chunk.filePath.startsWith(folderPath + "/"),
       );
     }
+
+    this.logger.log({
+      level: "debug",
+      type: "rag",
+      message: `RAG 检索: "${query.slice(0, 200)}"`,
+      data: {
+        query: query,
+        resultCount: results.length,
+        topScore: results.length > 0 ? results[0]!.score : 0,
+        scope: this.config.scope,
+      },
+    });
 
     return results;
   }

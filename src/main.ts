@@ -10,17 +10,32 @@ import { ChatMessage, chatStream, chatStreamWithTools, createOpenAIClient } from
 import { getSelectedText } from "./note-operations";
 import { RagEngine } from "./core/rag/index";
 import { VaultService, getToolDefinitions } from "./vault-service";
+import { AgentLogger } from "./core/logger/index";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
 	ragEngine!: RagEngine;
 	vaultService!: VaultService;
+	logger!: AgentLogger;
 
 	async onload() {
 		await this.loadSettings();
 
-		this.ragEngine = new RagEngine(this.app, this.settings.rag);
-		this.vaultService = new VaultService(this.app);
+		this.logger = new AgentLogger(
+			this.app.vault.adapter,
+			".obsidian/plugins/note-weaver/agent-logs",
+		);
+		await this.logger.initialize();
+
+		this.logger.log({
+			level: "info",
+			type: "system",
+			message: "Note Weaver 插件已加载",
+			data: { version: this.manifest.version },
+		});
+
+		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
+		this.vaultService = new VaultService(this.app, this.logger);
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -103,7 +118,13 @@ export default class NoteWeaver extends Plugin {
 		});
 	}
 
-	onunload() {}
+	onunload() {
+		this.logger.log({
+			level: "info",
+			type: "system",
+			message: "Note Weaver 插件已卸载",
+		});
+	}
 
 	private async promptForFilePath(): Promise<string | null> {
 		const input = document.createElement("input");
@@ -120,9 +141,17 @@ export default class NoteWeaver extends Plugin {
 	async buildRagIndex(): Promise<void> {
 		new Notice("正在重建知识索引...");
 		await this.ragEngine.buildIndex(true);
+		const fileCount = this.ragEngine.getIndexedFileCount();
+		const chunkCount = this.ragEngine.getChunkCount();
 		new Notice(
-			`知识索引重建完成，已索引 ${this.ragEngine.getIndexedFileCount()} 篇笔记，${this.ragEngine.getChunkCount()} 个片段`,
+			`知识索引重建完成，已索引 ${fileCount} 篇笔记，${chunkCount} 个片段`,
 		);
+		this.logger.log({
+			level: "info",
+			type: "system",
+			message: `知识索引重建完成，已索引 ${fileCount} 篇笔记`,
+			data: { fileCount, chunkCount },
+		});
 	}
 
 	/**
@@ -194,6 +223,8 @@ export default class NoteWeaver extends Plugin {
 			messages,
 			getToolDefinitions(),
 			this.settings.maxTokens,
+			this.settings.thinkingMode,
+			this.settings.reasoningEffort,
 			signal,
 		);
 	}

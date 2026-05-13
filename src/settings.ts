@@ -8,6 +8,8 @@ export interface NoteWeaverSettings {
 	baseUrl: string;
 	modelName: string;
 	maxTokens: number;
+	thinkingMode: boolean;
+	reasoningEffort: "high" | "max";
 	rag: RagConfig;
 }
 
@@ -16,6 +18,8 @@ export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	baseUrl: "https://api.deepseek.com",
 	modelName: "deepseek-v4-flash",
 	maxTokens: 16384,
+	thinkingMode: true,
+	reasoningEffort: "high",
 	rag: DEFAULT_RAG_CONFIG,
 };
 
@@ -118,6 +122,44 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 						}
 					}),
 			);
+
+		// ── 思考模式设置 ──
+		// eslint-disable-next-line obsidianmd/ui/sentence-case
+		new Setting(containerEl).setName("思考模式").setHeading();
+
+		const effortSetting = new Setting(containerEl);
+
+		new Setting(containerEl)
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setName("启用思考模式")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("开启后模型会先进行内部推理再输出答案（仅 DeepSeek 等部分模型支持）")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.thinkingMode)
+					.onChange(async (value) => {
+						this.plugin.settings.thinkingMode = value;
+						effortSetting.setDisabled(!value);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		effortSetting
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setName("思考强度")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("控制模型推理的深度，high 适合常规任务，max 适合复杂任务")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("high", "high")
+					.addOption("max", "max")
+					.setValue(this.plugin.settings.reasoningEffort)
+					.onChange(async (value: string) => {
+						this.plugin.settings.reasoningEffort = value as "high" | "max";
+						await this.plugin.saveSettings();
+					}),
+			);
+		effortSetting.setDisabled(!this.plugin.settings.thinkingMode);
 
 		new Setting(containerEl).setDesc(
 			// eslint-disable-next-line obsidianmd/ui/sentence-case

@@ -18,6 +18,7 @@ export interface AssistantToolCallMessage {
 	role: "assistant";
 	content: string | null;
 	tool_calls: ToolCall[];
+	reasoning_content?: string | null;
 }
 
 export interface ToolResultMessage {
@@ -44,7 +45,7 @@ export interface ToolDefinition {
 
 export type StreamEvent =
 	| { type: "content"; content: string }
-	| { type: "tool_calls"; calls: ToolCall[] };
+	| { type: "tool_calls"; calls: ToolCall[]; reasoningContent: string };
 
 export function createOpenAIClient(baseUrl: string, apiKey: string): OpenAI {
 	return new OpenAI({
@@ -86,26 +87,41 @@ export async function* chatStreamWithTools(
 	messages: ApiMessage[],
 	tools: ToolDefinition[],
 	maxTokens?: number,
+	thinkingMode?: boolean,
+	reasoningEffort?: string,
 	signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
+	const createParams: Record<string, unknown> = {
+		model,
+		messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+		stream: true,
+		tools: tools as OpenAI.Chat.Completions.ChatCompletionTool[],
+		max_tokens: maxTokens,
+	};
+
+	if (thinkingMode) {
+		createParams.reasoning_effort = reasoningEffort ?? "high";
+		createParams.extra_body = { thinking: { type: "enabled" } };
+	}
+
 	const stream = await client.chat.completions.create(
-		{
-			model,
-			messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-			stream: true,
-			tools: tools as OpenAI.Chat.Completions.ChatCompletionTool[],
-			max_tokens: maxTokens,
-		},
+		createParams as unknown as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
 		{ signal },
 	);
 
 	const toolCallAccumulators: Map<number, { id: string; name: string; args: string }> = new Map();
+	let reasoningContent = "";
 
 	for await (const chunk of stream) {
 		const choice = chunk.choices[0];
 		if (!choice) continue;
 
 		const delta = choice.delta;
+
+		const rc = (delta as unknown as Record<string, unknown>)?.reasoning_content;
+		if (typeof rc === "string") {
+			reasoningContent += rc;
+		}
 
 		if (delta?.content) {
 			yield { type: "content" as const, content: delta.content };
@@ -132,7 +148,7 @@ export async function* chatStreamWithTools(
 					type: "function" as const,
 					function: { name: acc.name, arguments: acc.args },
 				}));
-			yield { type: "tool_calls" as const, calls };
+			yield { type: "tool_calls" as const, calls, reasoningContent };
 			return;
 		}
 	}
