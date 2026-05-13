@@ -11,6 +11,8 @@ export interface NoteWeaverSettings {
 	thinkingMode: boolean;
 	reasoningEffort: "high" | "max";
 	rag: RagConfig;
+	webSearchEnabled: boolean;
+	webSearchMaxResults: number;
 }
 
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
@@ -21,6 +23,8 @@ export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	thinkingMode: true,
 	reasoningEffort: "high",
 	rag: DEFAULT_RAG_CONFIG,
+	webSearchEnabled: true,
+	webSearchMaxResults: 5,
 };
 
 export class NoteWeaverSettingTab extends PluginSettingTab {
@@ -155,6 +159,38 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 		effortSetting.setDisabled(!this.plugin.settings.thinkingMode);
+
+		// ── 网络搜索设置 ──
+		new Setting(containerEl).setName("网络搜索").setHeading();
+
+		new Setting(containerEl)
+			.setName("启用网络搜索")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("开启后，AI 助手可通过 DuckDuckGo 搜索互联网获取实时信息")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.webSearchEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.webSearchEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("最大搜索结果数")
+			.setDesc("每次搜索返回的最大结果数量")
+			.addText((text) =>
+				text
+					.setPlaceholder("5")
+					.setValue(String(this.plugin.settings.webSearchMaxResults))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num > 0 && num <= 20) {
+							this.plugin.settings.webSearchMaxResults = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
 
 		new Setting(containerEl).setDesc(
 			// eslint-disable-next-line obsidianmd/ui/sentence-case

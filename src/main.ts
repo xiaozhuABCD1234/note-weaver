@@ -10,11 +10,13 @@ import { ApiMessage, ChatMessage, chatStream, chatStreamWithTools, createOpenAIC
 import { RagEngine } from "./core/rag/index";
 import { VaultService, getToolDefinitions } from "./vault-service";
 import { AgentLogger } from "./core/logger/index";
+import { WebService } from "./web-service";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
 	ragEngine!: RagEngine;
 	vaultService!: VaultService;
+	webService!: WebService;
 	logger!: AgentLogger;
 
 	async onload() {
@@ -33,8 +35,9 @@ export default class NoteWeaver extends Plugin {
 			data: { version: this.manifest.version },
 		});
 
+		this.webService = new WebService(this.settings.webSearchMaxResults, this.logger);
 		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
-		this.vaultService = new VaultService(this.app, this.logger);
+		this.vaultService = new VaultService(this.app, this.logger, this.webService);
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case

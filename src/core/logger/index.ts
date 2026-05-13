@@ -48,6 +48,16 @@ export class AgentLogger {
     return { value, truncated: false };
   }
 
+  logLarge(entry: Omit<LogEntry, "id" | "timestamp">): void {
+    if (!this.config.enabled) return;
+    const fullEntry: LogEntry = {
+      id: generateId(),
+      timestamp: new Date().toISOString(),
+      ...entry,
+    };
+    this.writeEntry(fullEntry).catch(() => {});
+  }
+
   log(entry: Omit<LogEntry, "id" | "timestamp">): void {
     if (!this.config.enabled) return;
 

@@ -1,6 +1,7 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { AgentLogger } from "./core/logger/index";
 import type { ToolCall, ToolResultMessage } from "./api";
+import { WebService } from "./web-service";
 
 export interface VaultFileEntry {
 	path: string;
@@ -22,9 +23,15 @@ export class VaultService {
 	lastWritePath: string | null = null;
 	lastWriteContent: string | null = null;
 	private logger: AgentLogger;
+	private webService: WebService;
 
-	constructor(private app: App, logger: AgentLogger) {
+	constructor(
+		private app: App,
+		logger: AgentLogger,
+		webService: WebService,
+	) {
 		this.logger = logger;
+		this.webService = webService;
 	}
 
 	async readNote(path: string): Promise<string> {
@@ -152,16 +159,17 @@ export class VaultService {
 				case "list_folder":
 					result = JSON.stringify(this.listFolder(args.path as string | undefined));
 					break;
+				case "web_search":
+					result = JSON.stringify(
+						await this.webService.search(args.query as string),
+					);
+					break;
+				case "fetch_webpage":
+					result = await this.webService.fetchPage(args.url as string);
+					break;
 				default:
 					throw new Error(`Unknown tool: ${call.function.name}`);
 			}
-
-			this.logger.log({
-				level: "info",
-				type: "tool",
-				message: `工具执行: ${call.function.name}`,
-				data: { arguments: args, resultLength: result.length },
-			});
 
 			return result;
 		} catch (e) {
@@ -201,11 +209,11 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "read_note",
-				description: "Read the full content of a note from the vault by its path (e.g., 'folder/note.md')",
+				description: "读取 vault 中指定路径的笔记完整内容。当用户询问某篇笔记内容或需要分析笔记时使用",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Vault path to the note" },
+						path: { type: "string", description: "笔记路径，相对于 vault 根目录，如 '日记/2024-01-01.md'" },
 					},
 					required: ["path"],
 				},
@@ -215,12 +223,12 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "write_note",
-				description: "Create a new note or overwrite an existing one in the vault",
+				description: "创建新笔记或覆盖已有笔记。同时支持创建新文件和更新现有文件。content 为完整笔记内容（Markdown 格式）",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Vault path for the note (e.g., 'folder/note.md')" },
-						content: { type: "string", description: "Full content of the note (markdown)" },
+						path: { type: "string", description: "笔记路径，相对于 vault 根目录，如 '项目/需求分析.md'" },
+						content: { type: "string", description: "笔记完整内容，使用 Markdown 格式" },
 					},
 					required: ["path", "content"],
 				},
@@ -230,12 +238,12 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "append_note",
-				description: "Append content to the end of an existing note",
+				description: "向已有笔记末尾追加内容。适用于在笔记底部添加新信息，不会修改已有内容",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Vault path to the note" },
-						content: { type: "string", description: "Content to append" },
+						path: { type: "string", description: "笔记路径" },
+						content: { type: "string", description: "要追加的内容" },
 					},
 					required: ["path", "content"],
 				},
@@ -245,11 +253,11 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "delete_note",
-				description: "Delete a note from the vault permanently",
+				description: "永久删除 vault 中的笔记。注意：此操作不可逆，建议先与用户确认再执行",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Vault path to the note to delete" },
+						path: { type: "string", description: "要删除的笔记路径" },
 					},
 					required: ["path"],
 				},
@@ -259,12 +267,12 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "rename_note",
-				description: "Rename or move a note to a new path. Internal links are automatically updated.",
+				description: "重命名或移动笔记到新路径。会自动更新 vault 中所有指向该笔记的内部链接",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Current vault path of the note" },
-						newPath: { type: "string", description: "New vault path for the note" },
+						path: { type: "string", description: "笔记当前路径" },
+						newPath: { type: "string", description: "笔记新路径，可用于重命名或移动到不同文件夹" },
 					},
 					required: ["path", "newPath"],
 				},
@@ -274,11 +282,11 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "search_notes",
-				description: "Search for notes by filename or path. Returns matching files with their paths.",
+				description: "按文件名或路径搜索 vault 中的笔记。返回匹配的文件路径列表。适用于用户记得文件名但不确定位置时",
 				parameters: {
 					type: "object",
 					properties: {
-						query: { type: "string", description: "Search query (e.g., keyword or phrase)" },
+						query: { type: "string", description: "搜索关键词，匹配文件名和路径" },
 					},
 					required: ["query"],
 				},
@@ -288,11 +296,11 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "search_content",
-				description: "Search for specific text within all markdown notes in the vault. Returns matching file paths with surrounding context (snippet).",
+				description: "在所有 Markdown 笔记中搜索文本内容。返回匹配的文件路径及周围上下文片段。适用于需要按内容查找笔记时",
 				parameters: {
 					type: "object",
 					properties: {
-						query: { type: "string", description: "Text to search for within note contents" },
+						query: { type: "string", description: "要搜索的文本内容关键词" },
 					},
 					required: ["query"],
 				},
@@ -302,13 +310,41 @@ export function getToolDefinitions() {
 			type: "function" as const,
 			function: {
 				name: "list_folder",
-				description: "List all files and subfolders in a vault directory. Useful for browsing vault structure.",
+				description: "列出 vault 中指定文件夹内的文件和子文件夹。适用于浏览 vault 目录结构，查看某文件夹下有什么内容",
 				parameters: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Folder path relative to vault root (leave empty for root)" },
+						path: { type: "string", description: "文件夹路径，相对于 vault 根目录。留空则列出根目录" },
 					},
 					required: [],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "web_search",
+				description: "通过 DuckDuckGo 搜索互联网获取实时信息。适用于查询实时新闻、百科知识、最新资讯等 vault 中无法找到的信息",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "搜索关键词，使用自然语言描述即可" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "fetch_webpage",
+				description: "抓取指定 URL 网页的可读文本内容。适用于阅读在线文章、文档或任何网页内容。通常配合 web_search 使用：先搜索找到链接，再用此工具获取详细内容",
+				parameters: {
+					type: "object",
+					properties: {
+						url: { type: "string", description: "完整的网页 URL，如 https://example.com/article" },
+					},
+					required: ["url"],
 				},
 			},
 		},
