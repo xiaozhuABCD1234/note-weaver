@@ -7,7 +7,6 @@ import {
 } from "./settings";
 import { ChatView, VIEW_TYPE_CHAT } from "./view";
 import { ChatMessage, chatStream, chatStreamWithTools, createOpenAIClient } from "./api";
-import { getSelectedText } from "./note-operations";
 import { RagEngine } from "./core/rag/index";
 import { VaultService, getToolDefinitions } from "./vault-service";
 import { AgentLogger } from "./core/logger/index";
@@ -23,7 +22,7 @@ export default class NoteWeaver extends Plugin {
 
 		this.logger = new AgentLogger(
 			this.app.vault.adapter,
-			".obsidian/plugins/note-weaver/agent-logs",
+			`${this.app.vault.configDir}/plugins/note-weaver/agent-logs`,
 		);
 		await this.logger.initialize();
 
@@ -74,7 +73,6 @@ export default class NoteWeaver extends Plugin {
 				}
 				const leaf = await this.activateView();
 				if (leaf?.view instanceof ChatView) {
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 					leaf.view.setPendingSelection(selection);
 					new Notice("已读取选中文本，请在 AI 助手中输入修改要求");
 				}

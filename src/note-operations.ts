@@ -34,7 +34,7 @@ export async function applyModification(
 
 export async function createNewNote(app: App, content: string): Promise<TFile | null> {
 	const lines = content.split("\n");
-	const firstLine = (lines[0] ?? "").replace(/[#*\[\]]/g, "").trim().slice(0, 30) || "新笔记";
+	const firstLine = (lines[0] ?? "").replace(/[#*[\]]/g, "").trim().slice(0, 30) || "新笔记";
 	const timestamp = Date.now().toString(36).slice(-4);
 	const filename = normalizePath(`${firstLine}-${timestamp}.md`);
 

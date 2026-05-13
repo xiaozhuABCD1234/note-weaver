@@ -1,17 +1,14 @@
 import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
 import NoteWeaver from "./main";
 import {
-	ChatMessage,
 	ApiMessage,
-	AiJsonResponse,
-	StreamEvent,
+	ChatMessage,
 	ToolCall,
 } from "./api";
 import {
 	getActiveNoteContext,
 	getSelectedText,
 } from "./note-operations";
-import { VaultService } from "./vault-service";
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";
 
@@ -164,7 +161,7 @@ export class ChatView extends ItemView {
 		if (!content || this.isLoading) return;
 
 		if (!this.plugin.settings.apiKey) {
-			new Notice("请先在设置中配置 API Key");
+			new Notice("请先在设置中配置 API key");
 			return;
 		}
 
@@ -379,7 +376,7 @@ export class ChatView extends ItemView {
 					);
 				}
 			} else {
-				bubble.setText((msg as ChatMessage).content);
+				bubble.setText(msg.content);
 			}
 		}
 	}

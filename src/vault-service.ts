@@ -76,7 +76,7 @@ export class VaultService {
 
 	async deleteNote(path: string): Promise<string> {
 		const file = this.getFile(path);
-		await this.app.vault.delete(file);
+		await this.app.fileManager.trashFile(file);
 		return `Deleted: ${path}`;
 	}
 

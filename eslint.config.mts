@@ -22,6 +22,11 @@ export default tseslint.config(
     },
   },
   ...obsidianmd.configs.recommended,
+  {
+    rules: {
+      "no-undef": "off",
+    },
+  },
   globalIgnores([
     "node_modules",
     "dist",

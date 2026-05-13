@@ -1,4 +1,4 @@
-import { App, TFile, TFolder, Notice } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import { Chunk, RagConfig, SearchResult } from "./types";
 import { chunkText } from "./chunker";
 import { createSearcher } from "./searcher";

@@ -51,8 +51,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("API key")
 			.setDesc(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				"用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。",
+		// eslint-disable-next-line obsidianmd/ui/sentence-case
+		"用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。",
 			)
 			.addText((text) =>
 				text
@@ -96,7 +96,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			.setDesc("要使用的模型名称，如 gpt-4、claude-3-5-sonnet")
 			.addText((text) =>
 				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 					.setPlaceholder("deepseek-v4-flash")
 					.setValue(this.plugin.settings.modelName)
 					.onChange(async (value) => {
@@ -106,8 +106,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setName("Max Tokens")
+			.setName("Max tokens")
 			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc("每次请求的最大 Token 数，防止 JSON 被截断")
 			.addText((text) =>
@@ -124,13 +123,11 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		// ── 思考模式设置 ──
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		new Setting(containerEl).setName("思考模式").setHeading();
 
 		const effortSetting = new Setting(containerEl);
 
 		new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setName("启用思考模式")
 			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc("开启后模型会先进行内部推理再输出答案（仅 DeepSeek 等部分模型支持）")
@@ -145,14 +142,12 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		effortSetting
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setName("思考强度")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc("控制模型推理的深度，high 适合常规任务，max 适合复杂任务")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("high", "high")
-					.addOption("max", "max")
+					.addOption("high", "High")
+					.addOption("max", "Max")
 					.setValue(this.plugin.settings.reasoningEffort)
 					.onChange(async (value: string) => {
 						this.plugin.settings.reasoningEffort = value as "high" | "max";
@@ -233,14 +228,12 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setName("检索范围")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc("限制 AI 助手检索笔记的范围")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("current-folder", "当前文件夹")
-					.addOption("all-vault", "整个 Vault")
+					.addOption("all-vault", "整个 vault")
 					.setValue(this.plugin.settings.rag.scope)
 					.onChange(async (value: string) => {
 						this.plugin.settings.rag.scope = value as FileScope;
