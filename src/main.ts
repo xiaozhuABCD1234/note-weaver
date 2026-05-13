@@ -6,7 +6,7 @@ import {
 	NoteWeaverSettingTab,
 } from "./settings";
 import { ChatView, VIEW_TYPE_CHAT } from "./view";
-import { ChatMessage, chatStream, chatStreamWithTools, createOpenAIClient } from "./api";
+import { ApiMessage, ChatMessage, chatStream, chatStreamWithTools, createOpenAIClient } from "./api";
 import { RagEngine } from "./core/rag/index";
 import { VaultService, getToolDefinitions } from "./vault-service";
 import { AgentLogger } from "./core/logger/index";
@@ -211,7 +211,7 @@ export default class NoteWeaver extends Plugin {
 	}
 
 	getChatStreamWithTools(
-		messages: import("./api").ApiMessage[],
+		messages: ApiMessage[],
 		signal?: AbortSignal,
 	) {
 		const client = this.getOpenAIClient();

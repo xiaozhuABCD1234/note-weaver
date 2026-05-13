@@ -29,11 +29,6 @@ export interface ToolResultMessage {
 
 export type ApiMessage = ChatMessage | AssistantToolCallMessage | ToolResultMessage;
 
-export interface AiJsonResponse {
-	reply: string;
-	modified_note?: string;
-}
-
 export interface ToolDefinition {
 	type: "function";
 	function: {

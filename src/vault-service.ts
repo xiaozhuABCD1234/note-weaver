@@ -1,20 +1,6 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { AgentLogger } from "./core/logger/index";
-
-export interface ToolCall {
-	id: string;
-	type: "function";
-	function: {
-		name: string;
-		arguments: string;
-	};
-}
-
-export interface ToolResultMessage {
-	role: "tool";
-	tool_call_id: string;
-	content: string;
-}
+import type { ToolCall, ToolResultMessage } from "./api";
 
 export interface VaultFileEntry {
 	path: string;

@@ -12,13 +12,8 @@ import {
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";
 
-type ViewMessage =
-	| ChatMessage
-	| { role: "assistant"; content: string | null; tool_calls: ToolCall[] }
-	| { role: "tool"; tool_call_id: string; content: string };
-
 export class ChatView extends ItemView {
-	messages: ViewMessage[] = [];
+	messages: ApiMessage[] = [];
 	isLoading = false;
 	private plugin: NoteWeaver;
 	private messagesEl: HTMLElement | null = null;
@@ -200,7 +195,7 @@ export class ChatView extends ItemView {
 			data: { content: content, hasSelection: !!selection },
 		});
 
-		const aiMessage: ViewMessage = { role: "assistant", content: "" };
+		const aiMessage: ApiMessage = { role: "assistant", content: "" };
 		this.messages.push(aiMessage);
 
 		try {
