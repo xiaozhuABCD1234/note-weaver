@@ -1,17 +1,27 @@
 import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
 import NoteWeaver from "./main";
-import { ChatMessage, AiJsonResponse } from "./api";
+import {
+	ChatMessage,
+	ApiMessage,
+	AiJsonResponse,
+	StreamEvent,
+	ToolCall,
+} from "./api";
 import {
 	getActiveNoteContext,
 	getSelectedText,
-	applyModification,
-	createNewNote,
 } from "./note-operations";
+import { VaultService } from "./vault-service";
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";
 
+type ViewMessage =
+	| ChatMessage
+	| { role: "assistant"; content: string | null; tool_calls: ToolCall[] }
+	| { role: "tool"; tool_call_id: string; content: string };
+
 export class ChatView extends ItemView {
-	messages: ChatMessage[] = [];
+	messages: ViewMessage[] = [];
 	isLoading = false;
 	private plugin: NoteWeaver;
 	private messagesEl: HTMLElement | null = null;
@@ -21,6 +31,7 @@ export class ChatView extends ItemView {
 	private abortController: AbortController | null = null;
 	private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
 	private pendingSelection: string | null = null;
+	private maxToolRounds = 10;
 
 	constructor(leaf: WorkspaceLeaf, plugin: NoteWeaver) {
 		super(leaf);
@@ -48,23 +59,27 @@ export class ChatView extends ItemView {
 		const selection = this.pendingSelection ?? getSelectedText(this.app);
 
 		const sysContent: string[] = [
-			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你具有读取和修改当前笔记的能力，也可以搜索 Vault 中的其他笔记。",
+			"你是 Note Weaver AI 助手，运行在 Obsidian 笔记软件中。你有读取和修改库内任意笔记的能力。",
 			"",
-			"请严格以 JSON 格式输出，格式如下：",
-			"{",
-			'  "reply": "你对用户问题的文字回复",',
-			'  "modified_note": "如果用户要求修改笔记，此处放修改后的完整笔记内容"',
-			"}",
+			"可用工具：",
+			"- read_note(path): 读取库内指定路径的笔记内容",
+			"- write_note(path, content): 创建新笔记或覆盖已有笔记",
+			"- append_note(path, content): 向已有笔记末尾追加内容",
+			"- delete_note(path): 永久删除笔记",
+			"- rename_note(path, newPath): 重命名或移动笔记（自动更新内部链接）",
+			"- search_notes(query): 按文件名搜索笔记",
+			"- search_content(query): 在所有笔记中搜索文本内容",
+			"- list_folder(path): 列出库内文件夹中的文件和子文件夹",
 			"",
-			"规则：",
-			'- "reply" 字段始终存在',
-			'- 仅当用户明确要求修改笔记内容时，才包含 "modified_note" 字段',
-			'- "modified_note" 必须是笔记的完整内容',
+			"使用指南：",
+			"- 当用户询问笔记内容时，使用 read_note 或 search_notes 主动读取",
+			"- 当用户要求修改/创建/整理笔记时，使用 write_note 等工具直接操作",
+			"- 每次操作后向用户说明你做了什么",
 		];
 
 		if (note) {
 			sysContent.push(
-				`\n当前打开的笔记为：「${note.file.basename}」`,
+				`\n当前打开的笔记为：「${note.file.basename}」(${note.file.path})`,
 				"笔记完整内容：",
 				"---",
 				note.content,
@@ -162,13 +177,10 @@ export class ChatView extends ItemView {
 		this.previewEl?.empty();
 
 		const systemMessage = await this.buildSystemMessage(content);
-		const apiMessages: ChatMessage[] = [
-			systemMessage,
-			...this.messages,
-			{ role: "user", content },
-		];
+		const currentDisplayMessages = [...this.messages];
 
-		this.messages.push({ role: "user", content });
+		const userMessage: ChatMessage = { role: "user", content };
+		this.messages.push(userMessage);
 		await this.renderMessages();
 		this.scrollToBottom();
 
@@ -184,45 +196,79 @@ export class ChatView extends ItemView {
 		};
 		window.addEventListener("keydown", this.escapeHandler);
 
-		const aiMessage: ChatMessage = { role: "assistant", content: "" };
+		const aiMessage: ViewMessage = { role: "assistant", content: "" };
 		this.messages.push(aiMessage);
 
 		try {
-			const stream = this.plugin.getChatStream(
-				selection ? apiMessages : apiMessages,
-				this.abortController.signal,
-			);
+			let currentMessages: ApiMessage[] = [
+				systemMessage,
+				...currentDisplayMessages,
+				userMessage,
+			];
+			let fullReply = "";
+			let toolRounds = 0;
 
-			let rawJsonBuffer = "";
-			let lastRenderedReply = "";
+			while (toolRounds < this.maxToolRounds) {
+				const stream = this.plugin.getChatStreamWithTools(
+					currentMessages,
+					this.abortController.signal,
+				);
 
-			for await (const chunk of stream) {
-				rawJsonBuffer += chunk;
+				let toolCalls: ToolCall[] | null = null;
+				let streamedContent = "";
 
-				const partialReply = this.extractPartialReply(rawJsonBuffer);
-				if (partialReply && partialReply !== lastRenderedReply) {
-					lastRenderedReply = partialReply;
-					aiMessage.content = partialReply;
-					await this.renderMessages();
-					this.scrollToBottom();
+				for await (const event of stream) {
+					if (event.type === "content") {
+						streamedContent += event.content;
+						fullReply += event.content;
+						aiMessage.content = fullReply;
+						await this.renderMessages();
+						this.scrollToBottom();
+					} else if (event.type === "tool_calls") {
+						toolCalls = event.calls;
+					}
 				}
+
+				if (toolCalls && toolCalls.length > 0) {
+					const toolNames = toolCalls.map(tc => tc.function.name).join(", ");
+					new Notice(`🤖 AI 正在执行: ${toolNames}`);
+
+					const results = await this.plugin.vaultService.executeToolCalls(toolCalls);
+
+					currentMessages = [
+						...currentMessages,
+						{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls },
+						...results,
+					];
+
+					if (this.plugin.vaultService.lastWriteContent) {
+						await this.showWritePreview(
+							this.plugin.vaultService.lastWritePath ?? "",
+							this.plugin.vaultService.lastWriteContent,
+						);
+					}
+
+					toolRounds++;
+					continue;
+				}
+
+				break;
 			}
 
-			try {
-				const parsed = JSON.parse(rawJsonBuffer) as AiJsonResponse;
-				aiMessage.content = parsed.reply;
-				await this.renderMessages();
-				if (parsed.modified_note) {
-					await this.showModificationPreview(parsed.modified_note);
-				}
-			} catch {
-				new Notice("AI 返回的 JSON 格式异常，已显示原始内容");
-				aiMessage.content = rawJsonBuffer;
-				await this.renderMessages();
+			if (toolRounds >= this.maxToolRounds) {
+				fullReply += "\n\n*[已超过最大工具调用轮数]*";
+				new Notice("AI 工具调用次数过多，已停止");
 			}
+
+			aiMessage.content = fullReply;
+			await this.renderMessages();
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {
-				aiMessage.content += "\n[已取消]";
+				if (aiMessage.content) {
+					aiMessage.content += "\n\n*[已取消]*";
+				} else {
+					aiMessage.content = "*[已取消]*";
+				}
 			} else {
 				aiMessage.content = `错误: ${
 					error instanceof Error ? error.message : "未知错误"
@@ -240,67 +286,25 @@ export class ChatView extends ItemView {
 		}
 	}
 
-	private extractPartialReply(buffer: string): string {
-		const match = buffer.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
-		return match?.[1] ?? "";
-	}
-
-	private async showModificationPreview(content: string): Promise<void> {
+	private async showWritePreview(path: string, content: string): Promise<void> {
 		if (!this.previewEl) return;
 		this.previewEl.empty();
 
 		const previewContainer = this.previewEl.createDiv("modification-preview");
-
-		const header = previewContainer.createDiv(
-			"modification-preview-header",
-		);
-		header.setText("修改预览");
+		const header = previewContainer.createDiv("modification-preview-header");
+		header.setText(`已写入: ${path}`);
 
 		const body = previewContainer.createDiv("modification-preview-body");
 		await MarkdownRenderer.render(this.app, content, body, "", this);
 
 		const actions = previewContainer.createDiv("modification-preview-actions");
-
-		const applyBtn = actions.createEl("button", {
-			text: "应用修改",
-			cls: "mod-preview-btn mod-preview-btn-apply",
-		});
-
-		const rejectBtn = actions.createEl("button", {
-			text: "忽略",
+		const closeBtn = actions.createEl("button", {
+			text: "关闭预览",
 			cls: "mod-preview-btn mod-preview-btn-reject",
 		});
-
-		const note = getActiveNoteContext(this.app);
-		if (note) {
-			applyBtn.setText("应用修改");
-			applyBtn.onclick = async () => {
-				try {
-					await applyModification(note.file, content);
-					new Notice("笔记已更新");
-					this.previewEl?.empty();
-				} catch (e) {
-					new Notice(
-						`修改失败: ${e instanceof Error ? e.message : "未知错误"}`,
-					);
-				}
-			};
-		} else {
-			applyBtn.setText("创建新笔记");
-			applyBtn.onclick = async () => {
-				const file = await createNewNote(this.app, content);
-				if (file) {
-					new Notice("新笔记已创建");
-					this.previewEl?.empty();
-				}
-			};
-		}
-
-		rejectBtn.onclick = () => {
+		closeBtn.onclick = () => {
 			this.previewEl?.empty();
 		};
-
-		this.scrollToBottom();
 	}
 
 	private updateInputState(): void {
@@ -316,6 +320,9 @@ export class ChatView extends ItemView {
 		this.messagesEl.empty();
 
 		for (const msg of this.messages) {
+			if (msg.role === "tool") continue;
+			if (msg.role === "assistant" && (msg as { tool_calls?: ToolCall[] }).tool_calls && !msg.content) continue;
+
 			const bubble = this.messagesEl.createDiv("message");
 			bubble.addClass(
 				msg.role === "user" ? "message-user" : "message-assistant",
@@ -332,7 +339,7 @@ export class ChatView extends ItemView {
 					);
 				}
 			} else {
-				bubble.setText(msg.content);
+				bubble.setText((msg as ChatMessage).content);
 			}
 		}
 	}

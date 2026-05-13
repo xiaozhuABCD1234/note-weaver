@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { App, Modal, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
 import {
 	DEFAULT_SETTINGS,
@@ -6,18 +6,21 @@ import {
 	NoteWeaverSettingTab,
 } from "./settings";
 import { ChatView, VIEW_TYPE_CHAT } from "./view";
-import { ChatMessage, chatStream, createOpenAIClient } from "./api";
+import { ChatMessage, chatStream, chatStreamWithTools, createOpenAIClient } from "./api";
 import { getSelectedText } from "./note-operations";
 import { RagEngine } from "./core/rag/index";
+import { VaultService, getToolDefinitions } from "./vault-service";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
 	ragEngine!: RagEngine;
+	vaultService!: VaultService;
 
 	async onload() {
 		await this.loadSettings();
 
 		this.ragEngine = new RagEngine(this.app, this.settings.rag);
+		this.vaultService = new VaultService(this.app);
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -64,6 +67,28 @@ export default class NoteWeaver extends Plugin {
 		});
 
 		this.addCommand({
+			id: "read-vault-file",
+			name: "读取库内文件并发送给 AI",
+			callback: async () => {
+				const filePath = await this.promptForFilePath();
+				if (!filePath) return;
+
+				const file = this.app.vault.getAbstractFileByPath(filePath);
+				if (!(file instanceof TFile)) {
+					new Notice(`文件不存在: ${filePath}`);
+					return;
+				}
+
+				const content = await this.app.vault.read(file);
+				const leaf = await this.activateView();
+				if (leaf?.view instanceof ChatView) {
+					leaf.view.setPendingSelection(`[文件: ${filePath}]\n\n${content}`);
+					new Notice(`已读取: ${filePath}，请在 AI 助手中提问`);
+				}
+			},
+		});
+
+		this.addCommand({
 			id: "rebuild-rag-index",
 			name: "重建知识索引",
 			callback: async () => {
@@ -79,6 +104,18 @@ export default class NoteWeaver extends Plugin {
 	}
 
 	onunload() {}
+
+	private async promptForFilePath(): Promise<string | null> {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.placeholder = "例如: folder/note.md";
+
+		return new Promise((resolve) => {
+			const modal = new FilePathModal(this.app, input, resolve);
+			modal.open();
+			setTimeout(() => input.focus(), 100);
+		});
+	}
 
 	async buildRagIndex(): Promise<void> {
 		new Notice("正在重建知识索引...");
@@ -146,6 +183,21 @@ export default class NoteWeaver extends Plugin {
 		return chatStream(client, this.settings.modelName, messages, this.settings.maxTokens, signal);
 	}
 
+	getChatStreamWithTools(
+		messages: import("./api").ApiMessage[],
+		signal?: AbortSignal,
+	) {
+		const client = this.getOpenAIClient();
+		return chatStreamWithTools(
+			client,
+			this.settings.modelName,
+			messages,
+			getToolDefinitions(),
+			this.settings.maxTokens,
+			signal,
+		);
+	}
+
 	/**
 	 * 验证插件配置的有效性
 	 *
@@ -204,5 +256,33 @@ export default class NoteWeaver extends Plugin {
 				}`,
 			];
 		}
+	}
+}
+
+class FilePathModal extends Modal {
+	constructor(
+		app: App,
+		private input: HTMLInputElement,
+		private resolve: (value: string | null) => void,
+	) {
+		super(app);
+		this.titleEl.setText("输入文件路径");
+		this.contentEl.appendChild(input);
+
+		const submitBtn = this.contentEl.createEl("button", {
+			text: "确定",
+			cls: "mod-cta",
+		});
+		submitBtn.onclick = () => {
+			this.close();
+			this.resolve(input.value || null);
+		};
+
+		input.addEventListener("keydown", (e: KeyboardEvent) => {
+			if (e.key === "Enter") {
+				this.close();
+				this.resolve(input.value || null);
+			}
+		});
 	}
 }
