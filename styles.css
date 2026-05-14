@@ -344,4 +344,8 @@ button.send-button:disabled {
 	background: var(--background-secondary);
 }
 
+.quick-ask-hidden {
+	display: none;
+}
+
 

@@ -102,7 +102,7 @@ export class ChatOrchestrator {
 				this.abortController.signal,
 				(delta) => {
 					aiMessage.content += delta;
-					this.handler.onMessagesChanged([...this.messages]);
+					void this.handler.onMessagesChanged([...this.messages]);
 				},
 			);
 

@@ -33,7 +33,7 @@ export function useChat(deps: ChatDeps) {
   }, []);
 
   const sendMessage = useCallback((content: string, app: App) => {
-    orchestratorRef.current?.sendMessage(content, app);
+    void orchestratorRef.current?.sendMessage(content, app);
   }, []);
 
   const abort = useCallback(() => {

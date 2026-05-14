@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { MarkdownRenderer } from "obsidian";
 import type { App, Component } from "obsidian";
-import type { ApiMessage, ChatMessage } from "@/types";
+import type { ApiMessage } from "@/types";
 
 interface MessageBubbleProps {
   message: ApiMessage;
@@ -15,7 +15,7 @@ export function MessageBubble({ message, component, app }: MessageBubbleProps) {
   useEffect(() => {
     if (message.role !== "assistant" || !message.content || !bubbleRef.current) return;
     bubbleRef.current.innerHTML = "";
-    MarkdownRenderer.render(app, message.content, bubbleRef.current, "", component);
+    void MarkdownRenderer.render(app, message.content, bubbleRef.current, "", component);
   }, [message.content, app, component]);
 
   if (message.role === "tool") return null;
@@ -26,7 +26,7 @@ export function MessageBubble({ message, component, app }: MessageBubbleProps) {
       ref={message.role === "assistant" ? bubbleRef : undefined}
       className={`message ${message.role === "user" ? "message-user" : "message-assistant"}`}
     >
-      {message.role === "user" && (message as ChatMessage).content}
+      {message.role === "user" && message.content}
     </div>
   );
 }
