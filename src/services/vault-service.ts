@@ -258,6 +258,72 @@ export class VaultService {
 					},
 				},
 			},
+			{
+				name: "edit_note",
+				handler: this.makeHandler(async (args) =>
+					this.editNote(
+						args.path as string,
+						args.oldSnippet as string,
+						args.newSnippet as string,
+					),
+				),
+				definition: {
+					type: "function",
+					function: {
+						name: "edit_note",
+						description: "在笔记中做精确文本替换：查找 oldSnippet 并替换为 newSnippet。适用于修改笔记中的特定段落",
+						parameters: {
+							type: "object",
+							properties: {
+								path: { type: "string", description: "笔记路径" },
+								oldSnippet: { type: "string", description: "要查找并替换的旧文本" },
+								newSnippet: { type: "string", description: "替换后的新文本" },
+							},
+							required: ["path", "oldSnippet", "newSnippet"],
+						},
+					},
+				},
+			},
+			{
+				name: "get_note_metadata",
+				handler: this.makeHandler(async (args) =>
+					JSON.stringify(await this.getMetadata(args.path as string)),
+				),
+				definition: {
+					type: "function",
+					function: {
+						name: "get_note_metadata",
+						description: "获取笔记的元数据信息，包括标题、创建时间、修改时间、标签、frontmatter 字段等",
+						parameters: {
+							type: "object",
+							properties: {
+								path: { type: "string", description: "笔记路径" },
+							},
+							required: ["path"],
+						},
+					},
+				},
+			},
+			{
+				name: "list_recent_notes",
+				handler: this.makeHandler(async (args) =>
+					JSON.stringify(this.listRecentNotes(args.limit as number | undefined)),
+				),
+				definition: {
+					type: "function",
+					function: {
+						name: "list_recent_notes",
+						description: "列出最近修改的笔记，按修改时间排序。limit 可选，默认返回最近 10 篇",
+						parameters: {
+							type: "object",
+							properties: {
+								limit: { type: "number", description: "返回的笔记数量上限，可选" },
+							},
+							required: [],
+						},
+					},
+				},
+			},
 		]);
 	}
 
@@ -368,6 +434,64 @@ export class VaultService {
 			}
 		}
 		return { files, folders };
+	}
+
+	async editNote(path: string, oldSnippet: string, newSnippet: string): Promise<string> {
+		const file = this.getFile(path);
+		const content = await this.app.vault.read(file);
+
+		const idx = content.indexOf(oldSnippet);
+		if (idx === -1) {
+			throw new Error(`在笔记中未找到匹配的文本: "${oldSnippet.slice(0, 50)}..."`);
+		}
+
+		const newContent = content.slice(0, idx) + newSnippet + content.slice(idx + oldSnippet.length);
+
+		const contextBefore = content.slice(Math.max(0, idx - 80), idx);
+		const contextAfter = content.slice(idx + oldSnippet.length, idx + oldSnippet.length + 80);
+
+		await this.app.vault.modify(file, newContent);
+
+		return [
+			`编辑完成: ${path}`,
+			"",
+			"替换详情：",
+			`查找: "${oldSnippet.slice(0, 100)}${oldSnippet.length > 100 ? "..." : ""}"`,
+			`替换为: "${newSnippet.slice(0, 100)}${newSnippet.length > 100 ? "..." : ""}"`,
+			"",
+			`替换位置上下文: ...${contextBefore}│${contextAfter}...`,
+		].join("\n");
+	}
+
+	async getMetadata(path: string): Promise<Record<string, unknown>> {
+		const file = this.getFile(path);
+		const content = await this.app.vault.read(file);
+		const stat = await this.app.vault.adapter.stat(file.path);
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+
+		return {
+			path: file.path,
+			basename: file.basename,
+			extension: file.extension,
+			size: stat?.size ?? 0,
+			created: stat?.ctime ? new Date(stat.ctime).toISOString() : null,
+			modified: stat?.mtime ? new Date(stat.mtime).toISOString() : null,
+			tags: frontmatter?.tags ?? [],
+			frontmatter: frontmatter ?? {},
+			contentLength: content.length,
+			parent: file.parent?.path ?? "/",
+		};
+	}
+
+	listRecentNotes(limit = 10): Array<{ path: string; basename: string; modified: string }> {
+		return this.app.vault.getFiles()
+			.sort((a, b) => (b.stat.mtime ?? 0) - (a.stat.mtime ?? 0))
+			.slice(0, Math.max(1, Math.min(limit, 100)))
+			.map(f => ({
+				path: f.path,
+				basename: f.basename,
+				modified: new Date(f.stat.mtime).toISOString(),
+			}));
 	}
 
 	private getFile(path: string): TFile {

@@ -1,3 +1,7 @@
+/**
+ * @deprecated 此文件已由 src/core/llm/openai-client.ts 的 OpenAIChatClient 替代。
+ * 保留向后兼容，新代码请使用 OpenAIChatClient (implements IChatClient)。
+ */
 import OpenAI from "openai";
 import type { ChatMessage, StreamEvent, ApiMessage, ToolCall, ToolDefinition } from "@/types";
 

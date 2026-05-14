@@ -1,34 +1,58 @@
-import OpenAI from "openai";
-import type { ToolCall, ApiMessage, ToolResultMessage, ToolDefinition } from "@/types";
-import { chatStreamWithTools } from "@/api/client";
+import type { ApiMessage, ToolCall, ToolDefinition } from "@/types";
+import type { IChatClient, AgentConfig } from "@/core/agent";
+import { AgentRuntime, ToolGateway } from "@/core/agent";
 import { AgentLogger } from "@/core/logger/index";
 
-type ExecuteToolCallsFn = (calls: ToolCall[]) => Promise<ToolResultMessage[]>;
-
-const TOOL_LIMITS: Record<string, number> = {
-	read_note: 3000,
-	search_content: 2000,
-	fetch_webpage: 4000,
-};
-
-const MAX_CUMULATIVE_CHARS = 12000;
+type ExecuteToolCallsFn = (calls: ToolCall[]) => Promise<Array<{ role: "tool"; tool_call_id: string; content: string }>>;
 
 export class SubAgentService {
-	private maxToolRounds = 5;
+	private runtime!: AgentRuntime;
+	private toolGateway: ToolGateway;
 	private executeToolCallsFn: ExecuteToolCallsFn | null = null;
 
 	constructor(
-		private getClient: () => OpenAI,
-		private modelName: string,
-		private maxTokens: number,
-		private thinkingMode: boolean,
-		private reasoningEffort: string,
-		private subAgentTools: ToolDefinition[],
+		private icClient: IChatClient,
+		private config: AgentConfig,
 		private logger: AgentLogger,
-	) {}
+	) {
+		this.toolGateway = new ToolGateway();
+		this.runtime = new AgentRuntime(icClient, this.toolGateway, config);
+	}
 
 	setToolExecutor(fn: ExecuteToolCallsFn): void {
 		this.executeToolCallsFn = fn;
+		this.registerSubAgentTools();
+		this.runtime = new AgentRuntime(this.icClient, this.toolGateway, this.config);
+	}
+
+	private registerSubAgentTools(): void {
+		const fn = this.executeToolCallsFn;
+		if (!fn) return;
+
+		const subAgentToolDefs = getSubAgentToolDefinitions();
+
+		this.toolGateway = new ToolGateway();
+
+		for (const def of subAgentToolDefs) {
+			const toolName = def.function.name;
+			this.toolGateway.register(
+				toolName,
+				async (args) => {
+					const result = await fn([{
+						id: crypto.randomUUID(),
+						type: "function",
+						function: { name: toolName, arguments: JSON.stringify(args) },
+					}]);
+					return {
+						content: result[0]?.content ?? "Error: no result from tool",
+						isError: false,
+					};
+				},
+				def,
+			);
+		}
+
+		this.runtime = new AgentRuntime(this.icClient, this.toolGateway, this.config);
 	}
 
 	async runSubAgent(prompt: string): Promise<string> {
@@ -46,9 +70,7 @@ export class SubAgentService {
 			content: prompt,
 		};
 
-		let currentMessages: ApiMessage[] = [systemMessage, userMessage];
-		let fullReply = "";
-		let toolRounds = 0;
+		const messages: ApiMessage[] = [systemMessage, userMessage];
 
 		this.logger.log({
 			level: "info",
@@ -57,157 +79,27 @@ export class SubAgentService {
 			data: { prompt },
 		});
 
-		while (toolRounds < this.maxToolRounds) {
-			const stream = chatStreamWithTools(
-				this.getClient(),
-				this.modelName,
-				currentMessages,
-				this.subAgentTools,
-				this.maxTokens,
-				this.thinkingMode,
-				this.reasoningEffort,
-			);
+		try {
+			const result = await this.runtime.run(messages);
 
-			let toolCalls: ToolCall[] | null = null;
-			let streamedContent = "";
-
-			try {
-				for await (const event of stream) {
-					if (event.type === "content") {
-						streamedContent += event.content;
-						fullReply += event.content;
-					} else if (event.type === "tool_calls") {
-						toolCalls = event.calls;
-					}
-				}
-			} catch (error) {
-				const errMsg = error instanceof Error ? error.message : String(error);
-				this.logger.log({
-					level: "error",
-					type: "subagent",
-					message: "子 Agent AI 调用失败",
-					data: { error: errMsg, toolRounds },
-				});
-				fullReply += `\n\n*[子 Agent 执行出错: ${errMsg}]*`;
-				break;
-			}
-
-			if (toolCalls && toolCalls.length > 0) {
-				const toolNames = toolCalls.map(tc => tc.function.name).join(", ");
-				this.logger.log({
-					level: "info",
-					type: "subagent",
-					message: `子 Agent 调用工具: ${toolNames}`,
-					data: { toolCalls: toolCalls.map(tc => ({ name: tc.function.name, args: tc.function.arguments })) },
-				});
-
-				const results = await this.executeToolCallsFn(toolCalls);
-
-				const truncatedResults: ToolResultMessage[] = results.map((r, i) => ({
-					...r,
-					content: this.truncateToolResult(toolCalls[i]?.function.name ?? "", r.content),
-				}));
-
-				currentMessages = [
-					...currentMessages,
-					{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls },
-					...truncatedResults,
-				];
-
-				this.enforceBudget(currentMessages);
-
-				toolRounds++;
-				continue;
-			}
-
-			break;
-		}
-
-		if (toolRounds >= this.maxToolRounds) {
-			fullReply += "\n\n*[子 Agent 已达到最大工具调用轮数]*";
-			this.logger.log({
-				level: "warn",
+			this.logger.logLarge({
+				level: "info",
 				type: "subagent",
-				message: "子 Agent 达到最大工具调用轮数",
+				message: "子 Agent 执行完成",
+				data: { reply: result.content, replyLength: result.content.length, toolRounds: result.toolRounds },
 			});
+
+			return result.content || "(子 Agent 未返回任何内容)";
+		} catch (error) {
+			const errMsg = error instanceof Error ? error.message : String(error);
+			this.logger.log({
+				level: "error",
+				type: "subagent",
+				message: "子 Agent 执行出错",
+				data: { error: errMsg },
+			});
+			return `*[子 Agent 执行出错: ${errMsg}]*`;
 		}
-
-		this.logger.logLarge({
-			level: "info",
-			type: "subagent",
-			message: "子 Agent 执行完成",
-			data: { reply: fullReply, replyLength: fullReply.length, toolRounds },
-		});
-
-		return fullReply || "(子 Agent 未返回任何内容)";
-	}
-
-	private truncateToolResult(toolName: string, content: string): string {
-		const limit = TOOL_LIMITS[toolName];
-		if (!limit || content.length <= limit) return content;
-
-		if (toolName === "search_content") {
-			const headLen = Math.floor(limit * 0.7);
-			return (
-				content.slice(0, headLen) +
-				`\n\n[...搜索内容已截断: 原始 ${content.length} 字符...]`
-			);
-		}
-
-		const headLen = Math.floor(limit * 0.6);
-		const tailLen = limit - headLen - 50;
-		return (
-			content.slice(0, headLen) +
-			`\n\n[...内容已截断: 原始 ${content.length} 字符, 保留首尾各 ${headLen}/${tailLen} 字符...]\n\n` +
-			content.slice(-tailLen)
-		);
-	}
-
-	private enforceBudget(messages: ApiMessage[]): void {
-		let total = 0;
-		const toolIndices: number[] = [];
-
-		messages.forEach((m, i) => {
-			const len = (m.content as string || "").length;
-			total += len;
-			if (m.role === "tool") toolIndices.push(i);
-		});
-
-		if (total <= MAX_CUMULATIVE_CHARS) return;
-
-		for (const idx of toolIndices) {
-			if (this.estimateTotalChars(messages) <= MAX_CUMULATIVE_CHARS) break;
-			const msg = messages[idx] as ToolResultMessage;
-			messages[idx] = { ...msg, content: this.progressiveCompress(msg.content) };
-		}
-	}
-
-	private progressiveCompress(content: string): string {
-		if (content.length <= 500) return content;
-
-		if (content.length <= 2000) {
-			const keepLen = Math.floor(content.length * 0.5);
-			const headLen = Math.floor(keepLen * 0.7);
-			const tailLen = keepLen - headLen;
-			return (
-				content.slice(0, headLen) +
-				`\n\n[...渐进压缩: ${content.length}→${keepLen} 字符...]\n\n` +
-				content.slice(-tailLen)
-			);
-		}
-
-		return (
-			content.slice(0, 400) +
-			`\n\n[...渐进压缩: ${content.length}→约 600 字符...]\n\n` +
-			content.slice(-200)
-		);
-	}
-
-	private estimateTotalChars(messages: ApiMessage[]): number {
-		return messages.reduce(
-			(sum, m) => sum + ((m.content as string) || "").length,
-			0,
-		);
 	}
 }
 
@@ -239,4 +131,93 @@ function buildSubAgentSystemPrompt(): string {
 		"3. 不要使用表情符号",
 		"4. 回答要简洁直接",
 	].join("\n");
+}
+
+function getSubAgentToolDefinitions(): ToolDefinition[] {
+	return [
+		{
+			type: "function",
+			function: {
+				name: "read_note",
+				description: "读取 vault 中指定路径的笔记完整内容",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "笔记路径，相对于 vault 根目录" },
+					},
+					required: ["path"],
+				},
+			},
+		},
+		{
+			type: "function",
+			function: {
+				name: "search_notes",
+				description: "按文件名或路径搜索 vault 中的笔记，返回匹配的文件路径列表",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "搜索关键词，匹配文件名和路径" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function",
+			function: {
+				name: "search_content",
+				description: "在所有 Markdown 笔记中搜索文本内容，返回匹配的文件路径及周围上下文片段",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "要搜索的文本内容关键词" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function",
+			function: {
+				name: "list_folder",
+				description: "列出 vault 中指定文件夹内的文件和子文件夹",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "文件夹路径，相对于 vault 根目录。留空则列出根目录" },
+					},
+					required: [],
+				},
+			},
+		},
+		{
+			type: "function",
+			function: {
+				name: "web_search",
+				description: "通过 DuckDuckGo 搜索互联网获取实时信息",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "搜索关键词" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function",
+			function: {
+				name: "fetch_webpage",
+				description: "抓取指定 URL 网页的可读文本内容",
+				parameters: {
+					type: "object",
+					properties: {
+						url: { type: "string", description: "完整的网页 URL" },
+					},
+					required: ["url"],
+				},
+			},
+		},
+	];
 }

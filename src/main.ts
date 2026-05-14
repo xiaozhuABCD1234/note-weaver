@@ -3,15 +3,14 @@ import OpenAI from "openai";
 import { DEFAULT_SETTINGS, NoteWeaverSettings } from "./settings";
 import { NoteWeaverSettingTab } from "./settings-tab";
 import { ChatView, VIEW_TYPE_CHAT } from "./chat/view";
-import { createOpenAIClient } from "./api/client";
 import { RagEngine } from "./core/rag/index";
 import { VaultService } from "./services/vault-service";
 import { SubAgentService } from "./services/sub-agent-service";
 import { AgentLogger } from "./core/logger/index";
 import { WebService } from "./services/web-service";
-import { getSubAgentToolDefinitions } from "./tools/definitions";
 import { ToolGateway, AgentRuntime } from "./core/agent";
 import { OpenAIChatClient } from "./core/llm";
+import { QuickAskController } from "./features/quick-ask";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
@@ -44,13 +43,24 @@ export default class NoteWeaver extends Plugin {
 		);
 		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
 
+		const subAgentClient = new OpenAIChatClient({
+			baseUrl: this.settings.baseUrl,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
+			model: this.settings.modelName,
+			maxTokens: this.settings.maxTokens,
+			thinkingMode: this.settings.thinkingMode,
+			reasoningEffort: this.settings.reasoningEffort,
+		});
+
 		const subAgentService = new SubAgentService(
-			() => this.getOpenAIClient(),
-			this.settings.modelName,
-			this.settings.maxTokens,
-			this.settings.thinkingMode,
-			this.settings.reasoningEffort,
-			getSubAgentToolDefinitions(),
+			subAgentClient,
+			{
+				model: this.settings.modelName,
+				maxTokens: this.settings.maxTokens,
+				maxToolRounds: 5,
+				thinkingMode: this.settings.thinkingMode,
+				reasoningEffort: this.settings.reasoningEffort,
+			},
 			this.logger,
 		);
 
@@ -88,6 +98,22 @@ export default class NoteWeaver extends Plugin {
 				reasoningEffort: this.settings.reasoningEffort,
 			},
 		);
+
+		const quickAskClient = new OpenAIChatClient({
+			baseUrl: this.settings.baseUrl,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
+			model: this.settings.modelName,
+			maxTokens: Math.min(this.settings.maxTokens, 4096),
+			thinkingMode: false,
+			reasoningEffort: "high",
+		});
+
+		const quickAskController = new QuickAskController(this.app, {
+			icClient: quickAskClient,
+			config: this.settings.quickAsk,
+		});
+		quickAskController.load();
+		this.register(() => quickAskController.unload());
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -212,13 +238,6 @@ export default class NoteWeaver extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-
-	getOpenAIClient(): OpenAI {
-		return createOpenAIClient(
-			this.settings.baseUrl,
-			this.decodeApiKey(this.settings.apiKey),
-		);
 	}
 
 	private decodeApiKey(encoded: string): string {

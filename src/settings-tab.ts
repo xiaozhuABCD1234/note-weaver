@@ -167,8 +167,22 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// ── Quick Ask 设置 ──
+		new Setting(containerEl).setName("Quick Ask").setHeading();
+
+		new Setting(containerEl)
+			.setName("启用 Quick Ask")
+			.setDesc("在编辑器中输入 @ 触发内联 AI 问答面板")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.quickAsk.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.quickAsk.enabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		new Setting(containerEl).setDesc(
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			"API Key 存储在本地插件配置中，请确保 Vault 环境安全。",
 		);
 
