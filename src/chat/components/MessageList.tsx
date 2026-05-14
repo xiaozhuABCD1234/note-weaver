@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { App, Component } from "obsidian";
-import type { ApiMessage } from "../../types";
+import type { ApiMessage } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 
 interface MessageListProps {

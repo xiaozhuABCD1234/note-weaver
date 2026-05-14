@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import type { App } from "obsidian";
-import { AppContext } from "../context/app-context";
+import { AppContext } from "@/context/app-context";
 
 export function useApp(): App {
   const app = useContext(AppContext);

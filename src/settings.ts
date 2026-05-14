@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import NoteWeaver from "./main";
-import { DEFAULT_RAG_CONFIG } from "./core/rag/index";
-import type { FileScope, RagConfig } from "./core/rag/types";
+import NoteWeaver from "@/main";
+import { DEFAULT_RAG_CONFIG } from "@/core/rag/index";
+import type { FileScope, RagConfig } from "@/core/rag/types";
 
 export interface NoteWeaverSettings {
 	apiKey: string;

@@ -1,6 +1,6 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
-import { AgentLogger } from "../core/logger/index";
-import type { ToolCall, ToolResultMessage } from "../types";
+import { AgentLogger } from "@/core/logger/index";
+import type { ToolCall, ToolResultMessage } from "@/types";
 import { WebService } from "./web-service";
 import { SubAgentService } from "./sub-agent-service";
 

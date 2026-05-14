@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Notice } from "obsidian";
 import type { App } from "obsidian";
-import type { ApiMessage } from "../types";
-import type { ChatDeps } from "../chat/chat-service";
-import { ChatOrchestrator } from "../chat/chat-service";
+import type { ApiMessage } from "@/types";
+import type { ChatDeps } from "@/chat/chat-service";
+import { ChatOrchestrator } from "@/chat/chat-service";
 
 export function useChat(deps: ChatDeps) {
   const [messages, setMessages] = useState<ApiMessage[]>([]);

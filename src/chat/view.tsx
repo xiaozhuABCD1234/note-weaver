@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { Root, createRoot } from "react-dom/client";
 import type { ChatDeps } from "./chat-service";
-import { AppContext } from "../context/app-context";
+import { AppContext } from "@/context/app-context";
 import { ChatPanel } from "./components/ChatPanel";
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";

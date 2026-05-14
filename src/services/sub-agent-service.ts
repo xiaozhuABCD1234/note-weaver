@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import type { ToolCall, ApiMessage, ToolResultMessage, ToolDefinition } from "../types";
-import { chatStreamWithTools } from "../api/client";
-import { AgentLogger } from "../core/logger/index";
+import type { ToolCall, ApiMessage, ToolResultMessage, ToolDefinition } from "@/types";
+import { chatStreamWithTools } from "@/api/client";
+import { AgentLogger } from "@/core/logger/index";
 
 type ExecuteToolCallsFn = (calls: ToolCall[]) => Promise<ToolResultMessage[]>;
 

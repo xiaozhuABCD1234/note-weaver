@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { App, Component } from "obsidian";
-import type { ChatDeps } from "../chat-service";
-import { useChat } from "../../hooks/use-chat";
-import { useApp } from "../../hooks/use-app";
+import type { ChatDeps } from "@/chat/chat-service";
+import { useChat } from "@/hooks/use-chat";
+import { useApp } from "@/hooks/use-app";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 

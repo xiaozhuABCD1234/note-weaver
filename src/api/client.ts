@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { ChatMessage, StreamEvent, ApiMessage, ToolCall, ToolDefinition } from "../types";
+import type { ChatMessage, StreamEvent, ApiMessage, ToolCall, ToolDefinition } from "@/types";
 
 export function createOpenAIClient(baseUrl: string, apiKey: string): OpenAI {
 	return new OpenAI({
