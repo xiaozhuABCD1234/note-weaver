@@ -1,10 +1,7 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
-import {
-	DEFAULT_SETTINGS,
-	NoteWeaverSettings,
-	NoteWeaverSettingTab,
-} from "./settings";
+import { DEFAULT_SETTINGS, NoteWeaverSettings } from "./settings";
+import { NoteWeaverSettingTab } from "./settings-tab";
 import { ChatView, VIEW_TYPE_CHAT } from "./chat/view";
 import { ApiMessage } from "./types";
 import { chatStreamWithTools, createOpenAIClient } from "./api/client";

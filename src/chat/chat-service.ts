@@ -2,6 +2,8 @@ import type { App } from "obsidian";
 import type { ApiMessage, ChatMessage, StreamEvent, ToolCall, ToolResultMessage } from "@/types";
 import { getActiveNoteContext, getSelectedText } from "@/services/note-operations";
 import { buildSystemPrompt } from "@/prompts/system-prompt";
+import type { IAgentLogger } from "@/core/logger/interface";
+import type { NoteWeaverSettings } from "@/settings";
 
 export interface ChatDeps {
 	getChatStreamWithTools(
@@ -14,24 +16,8 @@ export interface ChatDeps {
 	ragEngine: {
 		getContextForQuery(query: string): Promise<string>;
 	};
-	readonly settings: {
-		apiKey: string;
-		rag: { enabled: boolean };
-	};
-	logger: {
-		log(entry: {
-			level: string;
-			type: string;
-			message: string;
-			data?: Record<string, unknown>;
-		}): void;
-		logLarge(entry: {
-			level: string;
-			type: string;
-			message: string;
-			data?: Record<string, unknown>;
-		}): void;
-	};
+	readonly settings: Pick<NoteWeaverSettings, "apiKey" | "rag">;
+	logger: IAgentLogger;
 }
 
 export interface ChatEventHandler {

@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@/types";
 
-export function getToolDefinitions(): ToolDefinition[] {
+function baseToolDefinitions(): ToolDefinition[] {
 	return [
 		{
 			type: "function" as const,
@@ -13,65 +13,6 @@ export function getToolDefinitions(): ToolDefinition[] {
 						path: { type: "string", description: "笔记路径，相对于 vault 根目录，如 '日记/2024-01-01.md'" },
 					},
 					required: ["path"],
-				},
-			},
-		},
-		{
-			type: "function" as const,
-			function: {
-				name: "write_note",
-				description: "创建新笔记或覆盖已有笔记。同时支持创建新文件和更新现有文件。content 为完整笔记内容（Markdown 格式）",
-				parameters: {
-					type: "object",
-					properties: {
-						path: { type: "string", description: "笔记路径，相对于 vault 根目录，如 '项目/需求分析.md'" },
-						content: { type: "string", description: "笔记完整内容，使用 Markdown 格式" },
-					},
-					required: ["path", "content"],
-				},
-			},
-		},
-		{
-			type: "function" as const,
-			function: {
-				name: "append_note",
-				description: "向已有笔记末尾追加内容。适用于在笔记底部添加新信息，不会修改已有内容",
-				parameters: {
-					type: "object",
-					properties: {
-						path: { type: "string", description: "笔记路径" },
-						content: { type: "string", description: "要追加的内容" },
-					},
-					required: ["path", "content"],
-				},
-			},
-		},
-		{
-			type: "function" as const,
-			function: {
-				name: "delete_note",
-				description: "永久删除 vault 中的笔记。注意：此操作不可逆，建议先与用户确认再执行",
-				parameters: {
-					type: "object",
-					properties: {
-						path: { type: "string", description: "要删除的笔记路径" },
-					},
-					required: ["path"],
-				},
-			},
-		},
-		{
-			type: "function" as const,
-			function: {
-				name: "rename_note",
-				description: "重命名或移动笔记到新路径。会自动更新 vault 中所有指向该笔记的内部链接",
-				parameters: {
-					type: "object",
-					properties: {
-						path: { type: "string", description: "笔记当前路径" },
-						newPath: { type: "string", description: "笔记新路径，可用于重命名或移动到不同文件夹" },
-					},
-					required: ["path", "newPath"],
 				},
 			},
 		},
@@ -145,24 +86,10 @@ export function getToolDefinitions(): ToolDefinition[] {
 				},
 			},
 		},
-		{
-			type: "function" as const,
-			function: {
-				name: "delegate_task",
-				description: "将需要大量信息收集、调研或分析的复杂任务委派给子 Agent 执行。子 Agent 可以读取笔记、搜索内容、搜索互联网，但不会直接修改笔记。适用于复杂调研任务分解",
-				parameters: {
-					type: "object",
-					properties: {
-						prompt: { type: "string", description: "子 Agent 需要完成的任务描述，需清晰说明目标和输出要求" },
-					},
-					required: ["prompt"],
-				},
-			},
-		},
 	];
 }
 
-export function getSubAgentToolDefinitions(): ToolDefinition[] {
+function subAgentBaseToolDefinitions(): ToolDefinition[] {
 	return [
 		{
 			type: "function" as const,
@@ -249,4 +176,87 @@ export function getSubAgentToolDefinitions(): ToolDefinition[] {
 			},
 		},
 	];
+}
+
+export function getToolDefinitions(): ToolDefinition[] {
+	return [
+		...baseToolDefinitions(),
+		{
+			type: "function" as const,
+			function: {
+				name: "write_note",
+				description: "创建新笔记或覆盖已有笔记。同时支持创建新文件和更新现有文件。content 为完整笔记内容（Markdown 格式）",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "笔记路径，相对于 vault 根目录，如 '项目/需求分析.md'" },
+						content: { type: "string", description: "笔记完整内容，使用 Markdown 格式" },
+					},
+					required: ["path", "content"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "append_note",
+				description: "向已有笔记末尾追加内容。适用于在笔记底部添加新信息，不会修改已有内容",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "笔记路径" },
+						content: { type: "string", description: "要追加的内容" },
+					},
+					required: ["path", "content"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "delete_note",
+				description: "永久删除 vault 中的笔记。注意：此操作不可逆，建议先与用户确认再执行",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "要删除的笔记路径" },
+					},
+					required: ["path"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "rename_note",
+				description: "重命名或移动笔记到新路径。会自动更新 vault 中所有指向该笔记的内部链接",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "笔记当前路径" },
+						newPath: { type: "string", description: "笔记新路径，可用于重命名或移动到不同文件夹" },
+					},
+					required: ["path", "newPath"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "delegate_task",
+				description: "将需要大量信息收集、调研或分析的复杂任务委派给子 Agent 执行。子 Agent 可以读取笔记、搜索内容、搜索互联网，但不会直接修改笔记。适用于复杂调研任务分解",
+				parameters: {
+					type: "object",
+					properties: {
+						prompt: { type: "string", description: "子 Agent 需要完成的任务描述，需清晰说明目标和输出要求" },
+					},
+					required: ["prompt"],
+				},
+			},
+		},
+	];
+}
+
+export function getSubAgentToolDefinitions(): ToolDefinition[] {
+	return subAgentBaseToolDefinitions();
 }
