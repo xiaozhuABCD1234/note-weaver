@@ -1,6 +1,7 @@
 import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
-import { ApiMessage } from "./api";
-import { ChatDeps, ChatEventHandler, ChatOrchestrator } from "./chat-service";
+import type { ApiMessage } from "../types";
+import type { ChatDeps, ChatEventHandler } from "./chat-service";
+import { ChatOrchestrator } from "./chat-service";
 
 export const VIEW_TYPE_CHAT = "note-weaver-chat";
 

@@ -1,16 +1,7 @@
 import type { App } from "obsidian";
-import {
-	ApiMessage,
-	ChatMessage,
-	StreamEvent,
-	ToolCall,
-	ToolResultMessage,
-} from "./api";
-import {
-	getActiveNoteContext,
-	getSelectedText,
-} from "./note-operations";
-import { buildSystemPrompt } from "./prompts/system-prompt";
+import type { ApiMessage, ChatMessage, StreamEvent, ToolCall, ToolResultMessage } from "../types";
+import { getActiveNoteContext, getSelectedText } from "../services/note-operations";
+import { buildSystemPrompt } from "../prompts/system-prompt";
 
 export interface ChatDeps {
 	getChatStreamWithTools(

@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import type { AgentLogger } from "./core/logger/index";
+import type { AgentLogger } from "../core/logger/index";
 
 export interface SearchResult {
 	title: string;
@@ -181,7 +181,6 @@ export class WebService {
 
 		if (results.length > 0) return results;
 
-		// Fallback parser: look for any result__body pattern
 		const altRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
 		let altMatch: RegExpExecArray | null;
 

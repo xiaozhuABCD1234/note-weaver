@@ -1,7 +1,7 @@
 {
   "id": "note-weaver",
   "name": "Note Weaver",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "minAppVersion": "0.15.0",
   "description": "AI 驱动的 Obsidian 笔记助手，支持智能问答、笔记修改和知识检索 (RAG)",
   "author": "xiaozhu",

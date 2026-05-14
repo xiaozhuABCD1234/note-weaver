@@ -24,5 +24,3 @@ export function getSelectedText(app: App): string | null {
 export function getActiveMarkdownView(app: App): MarkdownView | null {
 	return app.workspace.getActiveViewOfType(MarkdownView) ?? null;
 }
-
-

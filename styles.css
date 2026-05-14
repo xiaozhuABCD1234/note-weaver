@@ -42,34 +42,38 @@
 	color: var(--text-normal);
 	border-bottom-left-radius: var(--radius-s);
 	padding: var(--size-4-3) var(--size-4-4);
-}
-
-.message-assistant,
-.message-assistant .markdown-rendered {
 	user-select: text;
 }
 
+.message-assistant.markdown-rendered {
+	padding: var(--size-4-3) var(--size-4-4) !important;
+}
+
 .message-assistant .markdown-rendered {
-	padding: 0;
+	padding: var(--size-4-3) var(--size-4-4);
 	background: transparent;
 }
 
-.message-assistant .markdown-rendered p {
-	margin: 0 0 var(--size-4-2) 0;
+.message-assistant .markdown-rendered p,
+.message-assistant.markdown-rendered p {
+	margin: 0;
 }
 
-.message-assistant .markdown-rendered p:last-child {
-	margin-bottom: 0;
+.message-assistant .markdown-rendered p + p,
+.message-assistant.markdown-rendered p + p {
+	margin-top: var(--size-4-2);
 }
 
-.message-assistant .markdown-rendered code {
+.message-assistant .markdown-rendered code,
+.message-assistant.markdown-rendered code {
 	background: rgba(var(--mono-rgb-100), 0.08);
 	padding: 0 var(--size-4-1);
 	border-radius: var(--radius-s);
 	font-size: var(--font-ui-small);
 }
 
-.message-assistant .markdown-rendered pre {
+.message-assistant .markdown-rendered pre,
+.message-assistant.markdown-rendered pre {
 	background: var(--code-background);
 	padding: var(--size-4-3);
 	border-radius: var(--radius-m);
@@ -77,19 +81,23 @@
 	margin: var(--size-4-2) 0;
 }
 
-.message-assistant .markdown-rendered pre code {
+.message-assistant .markdown-rendered pre code,
+.message-assistant.markdown-rendered pre code {
 	background: transparent;
 	padding: 0;
 	color: var(--code-normal);
 }
 
 .message-assistant .markdown-rendered ul,
-.message-assistant .markdown-rendered ol {
+.message-assistant .markdown-rendered ol,
+.message-assistant.markdown-rendered ul,
+.message-assistant.markdown-rendered ol {
 	padding-left: var(--size-4-5);
 	margin: var(--size-4-2) 0;
 }
 
-.message-assistant .markdown-rendered blockquote {
+.message-assistant .markdown-rendered blockquote,
+.message-assistant.markdown-rendered blockquote {
 	border-left: 3px solid var(--interactive-normal);
 	margin: var(--size-4-2) 0;
 	padding-left: var(--size-4-3);
@@ -98,16 +106,21 @@
 
 .message-assistant .markdown-rendered h1,
 .message-assistant .markdown-rendered h2,
-.message-assistant .markdown-rendered h3 {
+.message-assistant .markdown-rendered h3,
+.message-assistant.markdown-rendered h1,
+.message-assistant.markdown-rendered h2,
+.message-assistant.markdown-rendered h3 {
 	margin: var(--size-4-3) 0 var(--size-4-2) 0;
 }
 
-.message-assistant .markdown-rendered a {
+.message-assistant .markdown-rendered a,
+.message-assistant.markdown-rendered a {
 	color: var(--text-accent);
 	text-decoration: none;
 }
 
-.message-assistant .markdown-rendered a:hover {
+.message-assistant .markdown-rendered a:hover,
+.message-assistant.markdown-rendered a:hover {
 	text-decoration: underline;
 }
 
