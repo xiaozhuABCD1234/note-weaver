@@ -10,9 +10,13 @@ import { ApiMessage } from "./types";
 import { chatStreamWithTools, createOpenAIClient } from "./api/client";
 import { RagEngine } from "./core/rag/index";
 import { VaultService } from "./services/vault-service";
+import { SubAgentService } from "./services/sub-agent-service";
 import { AgentLogger } from "./core/logger/index";
 import { WebService } from "./services/web-service";
-import { getToolDefinitions } from "./tools/definitions";
+import {
+	getToolDefinitions,
+	getSubAgentToolDefinitions,
+} from "./tools/definitions";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
@@ -37,9 +41,31 @@ export default class NoteWeaver extends Plugin {
 			data: { version: this.manifest.version },
 		});
 
-		this.webService = new WebService(this.settings.webSearchMaxResults, this.logger);
+		this.webService = new WebService(
+			this.settings.webSearchMaxResults,
+			this.logger,
+		);
 		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
-		this.vaultService = new VaultService(this.app, this.logger, this.webService);
+
+		const subAgentService = new SubAgentService(
+			() => this.getOpenAIClient(),
+			this.settings.modelName,
+			this.settings.maxTokens,
+			this.settings.thinkingMode,
+			this.settings.reasoningEffort,
+			getSubAgentToolDefinitions(),
+			this.logger,
+		);
+
+		this.vaultService = new VaultService(
+			this.app,
+			this.logger,
+			this.webService,
+			subAgentService,
+		);
+		subAgentService.setToolExecutor((calls) =>
+			this.vaultService.executeToolCalls(calls),
+		);
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -92,13 +118,17 @@ export default class NoteWeaver extends Plugin {
 			},
 		});
 
-		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, {
-			getChatStreamWithTools: this.getChatStreamWithTools.bind(this),
-			vaultService: this.vaultService,
-			ragEngine: this.ragEngine,
-			settings: this.settings,
-			logger: this.logger,
-		}));
+		this.registerView(
+			VIEW_TYPE_CHAT,
+			(leaf) =>
+				new ChatView(leaf, {
+					getChatStreamWithTools: this.getChatStreamWithTools.bind(this),
+					vaultService: this.vaultService,
+					ragEngine: this.ragEngine,
+					settings: this.settings,
+					logger: this.logger,
+				}),
+		);
 
 		this.addRibbonIcon("bot", "AI 助手", async () => {
 			await this.activateView();
@@ -182,10 +212,7 @@ export default class NoteWeaver extends Plugin {
 		}
 	}
 
-	getChatStreamWithTools(
-		messages: ApiMessage[],
-		signal?: AbortSignal,
-	) {
+	getChatStreamWithTools(messages: ApiMessage[], signal?: AbortSignal) {
 		const client = this.getOpenAIClient();
 		return chatStreamWithTools(
 			client,

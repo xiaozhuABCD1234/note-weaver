@@ -2,6 +2,7 @@ import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { AgentLogger } from "../core/logger/index";
 import type { ToolCall, ToolResultMessage } from "../types";
 import { WebService } from "./web-service";
+import { SubAgentService } from "./sub-agent-service";
 
 export interface VaultFileEntry {
 	path: string;
@@ -24,14 +25,17 @@ export class VaultService {
 	lastWriteContent: string | null = null;
 	private logger: AgentLogger;
 	private webService: WebService;
+	private subAgentService: SubAgentService;
 
 	constructor(
 		private app: App,
 		logger: AgentLogger,
 		webService: WebService,
+		subAgentService: SubAgentService,
 	) {
 		this.logger = logger;
 		this.webService = webService;
+		this.subAgentService = subAgentService;
 	}
 
 	async readNote(path: string): Promise<string> {
@@ -159,16 +163,19 @@ export class VaultService {
 				case "list_folder":
 					result = JSON.stringify(this.listFolder(args.path as string | undefined));
 					break;
-				case "web_search":
-					result = JSON.stringify(
-						await this.webService.search(args.query as string),
-					);
-					break;
-				case "fetch_webpage":
-					result = await this.webService.fetchPage(args.url as string);
-					break;
-				default:
-					throw new Error(`Unknown tool: ${call.function.name}`);
+			case "web_search":
+				result = JSON.stringify(
+					await this.webService.search(args.query as string),
+				);
+				break;
+			case "fetch_webpage":
+				result = await this.webService.fetchPage(args.url as string);
+				break;
+			case "delegate_task":
+				result = await this.subAgentService.runSubAgent(args.prompt as string);
+				break;
+			default:
+				throw new Error(`Unknown tool: ${call.function.name}`);
 			}
 
 			return result;

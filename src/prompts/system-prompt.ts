@@ -30,6 +30,7 @@ export function buildSystemPrompt(): string {
 		"- 用户问实时信息、新闻、百科 → web_search",
 		"- 需要详细阅读某网页 → web_search 找到链接，再用 fetch_webpage 获取内容",
 		"- 用户问 vault 目录结构 → list_folder",
+		"- 复杂任务需要大量调研或信息收集（如综合多篇笔记内容进行分析、跨多个来源的调研）→ delegate_task 委派给子 Agent 执行，子 Agent 可以读取笔记、搜索内容、搜索互联网，但不能修改笔记",
 		"",
 		"# 回答规范",
 		"",

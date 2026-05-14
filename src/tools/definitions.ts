@@ -1,4 +1,6 @@
-export function getToolDefinitions() {
+import type { ToolDefinition } from "../types";
+
+export function getToolDefinitions(): ToolDefinition[] {
 	return [
 		{
 			type: "function" as const,
@@ -138,6 +140,109 @@ export function getToolDefinitions() {
 					type: "object",
 					properties: {
 						url: { type: "string", description: "完整的网页 URL，如 https://example.com/article" },
+					},
+					required: ["url"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "delegate_task",
+				description: "将需要大量信息收集、调研或分析的复杂任务委派给子 Agent 执行。子 Agent 可以读取笔记、搜索内容、搜索互联网，但不会直接修改笔记。适用于复杂调研任务分解",
+				parameters: {
+					type: "object",
+					properties: {
+						prompt: { type: "string", description: "子 Agent 需要完成的任务描述，需清晰说明目标和输出要求" },
+					},
+					required: ["prompt"],
+				},
+			},
+		},
+	];
+}
+
+export function getSubAgentToolDefinitions(): ToolDefinition[] {
+	return [
+		{
+			type: "function" as const,
+			function: {
+				name: "read_note",
+				description: "读取 vault 中指定路径的笔记完整内容",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "笔记路径，相对于 vault 根目录" },
+					},
+					required: ["path"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "search_notes",
+				description: "按文件名或路径搜索 vault 中的笔记，返回匹配的文件路径列表",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "搜索关键词，匹配文件名和路径" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "search_content",
+				description: "在所有 Markdown 笔记中搜索文本内容，返回匹配的文件路径及周围上下文片段",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "要搜索的文本内容关键词" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "list_folder",
+				description: "列出 vault 中指定文件夹内的文件和子文件夹",
+				parameters: {
+					type: "object",
+					properties: {
+						path: { type: "string", description: "文件夹路径，相对于 vault 根目录。留空则列出根目录" },
+					},
+					required: [],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "web_search",
+				description: "通过 DuckDuckGo 搜索互联网获取实时信息",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "搜索关键词，使用自然语言描述即可" },
+					},
+					required: ["query"],
+				},
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: "fetch_webpage",
+				description: "抓取指定 URL 网页的可读文本内容",
+				parameters: {
+					type: "object",
+					properties: {
+						url: { type: "string", description: "完整的网页 URL" },
 					},
 					required: ["url"],
 				},
