@@ -8,7 +8,6 @@ export const VIEW_TYPE_CHAT = "note-weaver-chat";
 export class ChatView extends ItemView {
 	private orchestrator: ChatOrchestrator;
 	private messagesEl: HTMLElement | null = null;
-	private previewEl: HTMLElement | null = null;
 	private inputEl: HTMLTextAreaElement | null = null;
 	private sendBtnEl: HTMLButtonElement | null = null;
 
@@ -25,9 +24,6 @@ export class ChatView extends ItemView {
 			},
 			onLoadingChanged: (loading) => {
 				this.updateInputState(loading);
-			},
-			onWritePreview: async (path, content) => {
-				await this.showWritePreview(path, content);
 			},
 			onNotice: (message) => {
 				new Notice(message);
@@ -63,7 +59,6 @@ export class ChatView extends ItemView {
 		const wrapper = container.createDiv("chat-wrapper");
 
 		this.messagesEl = wrapper.createDiv("messages-wrapper");
-		this.previewEl = wrapper.createDiv("modification-preview-wrapper");
 		this.createInputArea(wrapper);
 
 		this.orchestrator.initialize();
@@ -102,30 +97,8 @@ export class ChatView extends ItemView {
 
 		this.inputEl.value = "";
 		this.inputEl.placeholder = "输入消息...";
-		this.previewEl?.empty();
 
 		await this.orchestrator.sendMessage(content, this.app);
-	}
-
-	private async showWritePreview(path: string, content: string): Promise<void> {
-		if (!this.previewEl) return;
-		this.previewEl.empty();
-
-		const previewContainer = this.previewEl.createDiv("modification-preview");
-		const header = previewContainer.createDiv("modification-preview-header");
-		header.setText(`已写入: ${path}`);
-
-		const body = previewContainer.createDiv("modification-preview-body");
-		await MarkdownRenderer.render(this.app, content, body, "", this);
-
-		const actions = previewContainer.createDiv("modification-preview-actions");
-		const closeBtn = actions.createEl("button", {
-			text: "关闭预览",
-			cls: "mod-preview-btn mod-preview-btn-reject",
-		});
-		closeBtn.onclick = () => {
-			this.previewEl?.empty();
-		};
 	}
 
 	private updateInputState(loading: boolean): void {
@@ -173,6 +146,5 @@ export class ChatView extends ItemView {
 
 	async onClose(): Promise<void> {
 		this.orchestrator.cleanup();
-		this.previewEl = null;
 	}
 }

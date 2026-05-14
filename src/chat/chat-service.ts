@@ -10,8 +10,6 @@ export interface ChatDeps {
 	): AsyncGenerator<StreamEvent>;
 	vaultService: {
 		executeToolCalls(calls: ToolCall[]): Promise<ToolResultMessage[]>;
-		readonly lastWritePath: string | null;
-		readonly lastWriteContent: string | null;
 	};
 	ragEngine: {
 		getContextForQuery(query: string): Promise<string>;
@@ -33,7 +31,6 @@ export interface ChatDeps {
 export interface ChatEventHandler {
 	onMessagesChanged(messages: ApiMessage[]): Promise<void>;
 	onLoadingChanged(loading: boolean): void;
-	onWritePreview(path: string, content: string): Promise<void>;
 	onNotice(message: string): void;
 }
 
@@ -155,13 +152,6 @@ export class ChatOrchestrator {
 						{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls, reasoning_content: reasoningContent || null },
 						...results,
 					];
-
-					if (this.deps.vaultService.lastWriteContent) {
-						await this.handler.onWritePreview(
-							this.deps.vaultService.lastWritePath ?? "",
-							this.deps.vaultService.lastWriteContent,
-						);
-					}
 
 					toolRounds++;
 					continue;

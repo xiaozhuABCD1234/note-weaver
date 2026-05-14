@@ -21,8 +21,6 @@ export interface VaultListing {
 }
 
 export class VaultService {
-	lastWritePath: string | null = null;
-	lastWriteContent: string | null = null;
 	private logger: AgentLogger;
 	private webService: WebService;
 	private subAgentService: SubAgentService;
@@ -47,8 +45,6 @@ export class VaultService {
 		const existing = this.app.vault.getAbstractFileByPath(normalizedPath);
 		if (existing instanceof TFile) {
 			await this.app.vault.modify(existing, content);
-			this.lastWritePath = normalizedPath;
-			this.lastWriteContent = content;
 			return `Updated: ${normalizedPath}`;
 		}
 		const parentPath = normalizedPath.contains("/")
@@ -58,16 +54,12 @@ export class VaultService {
 			await this.ensureFolder(parentPath);
 		}
 		await this.app.vault.create(normalizedPath, content);
-		this.lastWritePath = normalizedPath;
-		this.lastWriteContent = content;
 		return `Created: ${normalizedPath}`;
 	}
 
 	async appendNote(path: string, content: string): Promise<string> {
 		const file = this.getFile(path);
 		await this.app.vault.append(file, content);
-		this.lastWritePath = path;
-		this.lastWriteContent = content;
 		return `Appended to: ${path}`;
 	}
 
