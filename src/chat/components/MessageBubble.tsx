@@ -16,7 +16,7 @@ export function MessageBubble({ message, component, app }: MessageBubbleProps) {
     if (message.role !== "assistant" || !message.content || !bubbleRef.current) return;
     bubbleRef.current.innerHTML = "";
     MarkdownRenderer.render(app, message.content, bubbleRef.current, "", component);
-  }, [message, app, component]);
+  }, [message.content, app, component]);
 
   if (message.role === "tool") return null;
   if (message.role === "assistant" && "tool_calls" in message && !message.content) return null;

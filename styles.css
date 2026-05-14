@@ -125,55 +125,65 @@
 }
 
 .input-wrapper {
-	display: flex;
-	padding: var(--size-4-3);
-	border-top: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-modifier-form-field);
+	padding: calc(var(--size-2-3) + 1px);
+	margin: 0 var(--size-4-3) var(--size-4-3);
+}
+
+.input-wrapper:focus-within {
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
 .input-wrapper textarea {
-	flex: 1;
-	padding: var(--size-4-3) var(--size-4-4);
-	border: 1px solid var(--text-muted);
-	border-radius: var(--radius-m);
-	font-size: var(--font-ui-medium);
-	outline: none;
-	background: var(--background-primary);
+	width: 100%;
+	padding: var(--size-2-1);
+	border: none;
+	background: transparent;
 	color: var(--text-normal);
-	resize: vertical;
-	min-height: var(--size-4-9);
-	max-height: 200px;
 	font-family: inherit;
+	font-size: var(--font-ui-medium);
 	line-height: var(--line-height-normal);
-}
-
-.input-wrapper textarea:focus {
-	border-color: var(--text-accent);
-	box-shadow: 0 0 0 2px
-		hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2);
+	resize: vertical;
+	min-height: 80px;
+	max-height: 200px;
+	outline: none;
 }
 
 .input-wrapper textarea::placeholder {
 	color: var(--text-faint);
 }
 
-.input-wrapper button {
-	margin-left: var(--size-4-2);
-	padding: var(--size-4-3) var(--size-4-5);
-	background: var(--interactive-normal);
-	color: var(--text-normal);
+.controls-bar {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	min-height: var(--size-4-4);
+}
+
+button.send-button {
+	width: 24px;
+	height: 24px;
 	border: none;
-	border-radius: var(--radius-m);
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
 	cursor: pointer;
-	font-size: var(--font-ui-medium);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
 }
 
-.input-wrapper button:hover {
-	background: var(--background-modifier-hover);
+button.send-button.is-stop {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
 }
 
-.input-wrapper button:disabled {
+button.send-button:disabled {
 	background: var(--background-modifier-form-field);
+	color: var(--text-faint);
 	cursor: not-allowed;
 }
 

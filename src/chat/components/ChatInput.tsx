@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Square } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
@@ -52,9 +53,18 @@ export function ChatInput({ onSend, onCancel, isLoading, placeholder }: ChatInpu
         placeholder={placeholder ?? "输入消息..."}
         disabled={isLoading}
       />
-      <button onClick={handleClick}>
-        {isLoading ? "取消" : "发送"}
-      </button>
+      <div className="controls-bar">
+        <button
+          className={`send-button${isLoading ? " is-stop" : ""}`}
+          onClick={handleClick}
+        >
+          {isLoading ? (
+            <Square size={12} fill="currentColor" strokeWidth={0} />
+          ) : (
+            <ArrowUp size={16} strokeWidth={2.5} />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

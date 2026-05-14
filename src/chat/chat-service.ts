@@ -25,6 +25,12 @@ export interface ChatDeps {
 			message: string;
 			data?: Record<string, unknown>;
 		}): void;
+		logLarge(entry: {
+			level: string;
+			type: string;
+			message: string;
+			data?: Record<string, unknown>;
+		}): void;
 	};
 }
 
@@ -168,11 +174,11 @@ export class ChatOrchestrator {
 			aiMessage.content = fullReply;
 			await this.handler.onMessagesChanged(this.messages);
 
-			this.deps.logger.log({
+			this.deps.logger.logLarge({
 				level: "info",
 				type: "chat",
 				message: "AI 回复完成",
-				data: { replyLength: fullReply.length, toolRounds },
+				data: { reply: fullReply, replyLength: fullReply.length, toolRounds },
 			});
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {

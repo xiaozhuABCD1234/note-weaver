@@ -132,11 +132,11 @@ export class SubAgentService {
 			});
 		}
 
-		this.logger.log({
+		this.logger.logLarge({
 			level: "info",
 			type: "subagent",
 			message: "子 Agent 执行完成",
-			data: { replyLength: fullReply.length, toolRounds },
+			data: { reply: fullReply, replyLength: fullReply.length, toolRounds },
 		});
 
 		return fullReply || "(子 Agent 未返回任何内容)";

@@ -30,7 +30,7 @@ export default class NoteWeaver extends Plugin {
 
 		this.logger = new AgentLogger(
 			this.app.vault.adapter,
-			`${this.app.vault.configDir}/plugins/note-weaver/agent-logs`,
+			`${this.app.vault.configDir}/plugins/note-weaver/logs`,
 		);
 		await this.logger.initialize();
 

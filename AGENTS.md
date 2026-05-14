@@ -10,17 +10,25 @@
 ## Environment & tooling
 
 - Node.js: use current LTS (Node 18+ recommended).
-- **Package manager: npm** (required for this sample - `package.json` defines
-  npm scripts and dependencies).
-- **Bundler: esbuild** (required for this sample - `esbuild.config.mjs` and
-  build scripts depend on it). Alternative bundlers like Rollup or webpack are
-  acceptable for other projects if they bundle all external dependencies into
-  `main.js`.
+- **Package manager: npm** (required - `package.json` defines npm scripts and
+  dependencies).
+- **Bundler: esbuild** (required - `esbuild.config.mjs` and build scripts
+  depend on it). Config uses `jsx: "automatic"` and `format: "cjs"`. All
+  dependencies (React, Radix UI, Lucide, OpenAI SDK) are bundled into
+  `main.js`; only `obsidian`, `electron`, and CodeMirror packages are
+  external.
 - Types: `obsidian` type definitions.
+- **JSX**: `tsconfig.json` uses `"jsx": "react-jsx"` (automatic JSX runtime).
 
-**Note**: This sample project has specific technical dependencies on npm and
-esbuild. If you're creating a plugin from scratch, you can choose different
-tools, but you'll need to replace the build configuration accordingly.
+### Dependencies
+
+| Package               | Usage                                                     |
+| --------------------- | --------------------------------------------------------- |
+| `react` / `react-dom` | UI components in Obsidian ItemView                        |
+| `lucide-react`        | Vector icons, tree-shaken automatically                   |
+| `@radix-ui/*`         | Accessible UI primitives (Dialog, Popover, Tooltip, etc.) |
+| `openai`              | LLM API client (streaming tool calls)                     |
+| `obsidian`            | Plugin API (type definitions only, external at build)     |
 
 ### Install
 
@@ -55,6 +63,11 @@ npm run build
   modules rather than putting everything in `main.ts`.
 - Source lives in `src/`. Keep `main.ts` small and focused on plugin lifecycle
   (loading, unloading, registering commands).
+- **React components**: Place Reac components in feature directories under a
+  `components/` subfolder. One component per file, named after the component
+  (e.g. `ChatPanel.tsx`).
+- **Radix UI primitives**: Re-export or wrap Radix primitives in
+  `ui/radix/` so they can be imported consistently across the codebase.
 - **Example file structure**:
   ```
   src/
@@ -64,8 +77,11 @@ npm run build
       command1.ts
       command2.ts
     ui/              # UI components, modals, views
-      modal.ts
       view.ts
+      radix/         # Radix UI wrappers/re-exports
+        dialog.tsx
+        popover.tsx
+        tooltip.tsx
     utils/           # Utility functions, helpers
       helpers.ts
       constants.ts
@@ -109,6 +125,118 @@ npm run build
 - If the plugin has configuration, provide a settings tab and sensible defaults.
 - Persist settings using `this.loadData()` / `this.saveData()`.
 - Use stable command IDs; avoid renaming once released.
+
+## React UI development
+
+The plugin embeds React 19 inside Obsidian via `ItemView`. Follow these
+conventions for all React code.
+
+### Mounting lifecycle
+
+- Use `createRoot` from `react-dom/client` in `ItemView.onOpen()`.
+- Call `root.unmount()` in `onClose()` to prevent memory leaks.
+- Call `containerEl.empty()` before mounting to clear Obsidian's default view.
+
+```tsx
+import { ItemView, WorkspaceLeaf } from "obsidian";
+import { Root, createRoot } from "react-dom/client";
+
+export class MyView extends ItemView {
+  private root: Root | null = null;
+
+  protected async onOpen() {
+    this.containerEl.empty();
+    this.root = createRoot(this.containerEl);
+    this.root.render(<MyComponent />);
+  }
+
+  async onClose() {
+    this.root?.unmount();
+  }
+}
+```
+
+### Dependency injection
+
+- Use React Context to provide `App`, `Plugin`, or service instances to the
+  component tree. Define one context per concern in `src/context/`.
+- Wrap provider at the root render call inside `onOpen()`.
+
+### Hooks
+
+- Prefer functional components with hooks over class components.
+- Extract complex state/effect logic into custom hooks under `src/hooks/`.
+- Clean up subscriptions, listeners, and timers in `useEffect` return functions.
+- Use `useCallback` for handler props passed to child components to avoid
+  unnecessary re-renders.
+
+### Cleanup
+
+- Always return cleanup functions from `useEffect` for event listeners,
+  intervals, and AbortControllers.
+- Never store React state in plugin instances — use refs for imperative handles.
+
+## Icon usage (Lucide)
+
+This project uses `lucide-react` for all icons. Lucide icons are tree-shaken
+automatically by esbuild — only imported icons end up in the bundle.
+
+### Import
+
+```tsx
+import { ArrowUp, Square, Bot, Settings } from "lucide-react";
+```
+
+### Common props
+
+| Prop        | Type   | Default        | Description          |
+| ----------- | ------ | -------------- | -------------------- |
+| size        | number | 24             | Width & height in px |
+| color       | string | `currentColor` | Inherits text color  |
+| strokeWidth | number | 2              | Stroke width in px   |
+| fill        | string | `none`         | Fill color           |
+
+### Conventions
+
+- Use `currentColor` (default) so icons adapt to text color in themes.
+- Use `size` for consistent sizing; avoid custom width/height attributes.
+- When an icon is the sole interactive element (button), wrap it in a
+  `<button>` with `aria-label` for accessibility.
+- Prefer Lucide's built-in icons over inline SVGs.
+
+## Radix UI
+
+Radix UI provides accessible, unstyled React primitives. Wrap each Radix
+primitive in a thin re-export module under `ui/radix/` so imports stay
+consistent across the codebase and the primitive can be swapped later.
+
+### Usage pattern
+
+```tsx
+// ui/radix/dialog.tsx
+export { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogClose } from "@radix-ui/react-dialog";
+```
+
+```tsx
+// src/features/my-feature.tsx
+import { Dialog, DialogTrigger, DialogContent, DialogTitle } from "../ui/radix/dialog";
+```
+
+Always style Radix components using Obsidian CSS variables
+(`--background-primary`, `--text-normal`, etc.) to respect the user's theme.
+
+### Radix packages to use
+
+| Package                         | Purpose                        |
+| ------------------------------- | ------------------------------ |
+| `@radix-ui/react-dialog`        | Modals, confirmation dialogs   |
+| `@radix-ui/react-popover`       | Floating panels, context menus |
+| `@radix-ui/react-tooltip`       | Hover tooltips                 |
+| `@radix-ui/react-dropdown-menu` | Action menus                   |
+| `@radix-ui/react-select`        | Select/dropdown inputs         |
+| `@radix-ui/react-tabs`          | Tabbed panels                  |
+
+Import only what you use — esbuild tree-shakes unused exports.
 
 ## Versioning & releases
 
@@ -170,6 +298,12 @@ particular:
 - Avoid Node/Electron APIs if you want mobile compatibility; set `isDesktopOnly`
   accordingly.
 - Prefer `async/await` over promise chains; handle errors gracefully.
+- **React components**: Always use functional components with hooks. Never use
+  class components for React views. Use `useCallback` for callbacks passed as
+  props. Return cleanup functions from `useEffect` to prevent leaks.
+- **Radix UI**: Always wrap Radix primitives in re-export modules under
+  `ui/radix/`. Never import directly from `@radix-ui/*` package paths in
+  feature code. Style with Obsidian CSS variables only.
 
 ## Mobile
 
@@ -187,6 +321,12 @@ particular:
 - Write idempotent code paths so reload/unload doesn't leak listeners or
   intervals.
 - Use `this.register*` helpers for everything that needs cleanup.
+- **Fetch official documentation proactively**: Before implementing a feature
+  that uses an external library, framework, or API, always use the `skill` tool
+  to load its official documentation (via `webfetch` or skill-provided
+  resources). Do not rely on assumptions or stale knowledge. This applies to:
+  Obsidian API, Radix UI primitives, Lucide icons, OpenAI SDK, and any other
+  third-party dependency.
 
 **Don't**
 
@@ -195,6 +335,8 @@ particular:
 - Ship features that require cloud services without clear disclosure and
   explicit opt-in.
 - Store or transmit vault contents unless essential and consented.
+- Implement UI features based on assumptions about Radix UI or Obsidian
+  component APIs — always verify against current official docs first.
 
 ## Common tasks
 
