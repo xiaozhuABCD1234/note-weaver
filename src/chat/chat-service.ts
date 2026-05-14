@@ -209,11 +209,13 @@ export class ChatOrchestrator {
 		}
 	}
 
+	abort(): void {
+		this.abortController?.abort();
+	}
+
 	cleanup(): void {
-		if (this.abortController) {
-			this.abortController.abort();
-			this.abortController = null;
-		}
+		this.abort();
+		this.abortController = null;
 		if (this.escapeHandler) {
 			window.removeEventListener("keydown", this.escapeHandler);
 			this.escapeHandler = null;
