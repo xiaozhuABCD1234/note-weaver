@@ -2,7 +2,7 @@ import { App, TFile, TFolder } from "obsidian";
 import { Chunk, RagConfig, SearchResult } from "./types";
 import { chunkText } from "./chunker";
 import { createSearcher } from "./searcher";
-import { AgentLogger } from "../logger/index";
+import { AgentLogger } from "@/core/logger/index";
 
 export type { RagConfig } from "./types";
 

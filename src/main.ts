@@ -1,18 +1,16 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
-import {
-	DEFAULT_SETTINGS,
-	NoteWeaverSettings,
-	NoteWeaverSettingTab,
-} from "./settings";
+import { DEFAULT_SETTINGS, NoteWeaverSettings } from "./settings";
+import { NoteWeaverSettingTab } from "./settings-tab";
 import { ChatView, VIEW_TYPE_CHAT } from "./chat/view";
-import { ApiMessage } from "./types";
-import { chatStreamWithTools, createOpenAIClient } from "./api/client";
 import { RagEngine } from "./core/rag/index";
 import { VaultService } from "./services/vault-service";
+import { SubAgentService } from "./services/sub-agent-service";
 import { AgentLogger } from "./core/logger/index";
 import { WebService } from "./services/web-service";
-import { getToolDefinitions } from "./tools/definitions";
+import { ToolGateway, AgentRuntime } from "./core/agent";
+import { OpenAIChatClient } from "./core/llm";
+import { QuickAskController } from "./features/quick-ask";
 
 export default class NoteWeaver extends Plugin {
 	settings!: NoteWeaverSettings;
@@ -20,13 +18,15 @@ export default class NoteWeaver extends Plugin {
 	vaultService!: VaultService;
 	webService!: WebService;
 	logger!: AgentLogger;
+	toolGateway!: ToolGateway;
+	agentRuntime!: AgentRuntime;
 
 	async onload() {
 		await this.loadSettings();
 
 		this.logger = new AgentLogger(
 			this.app.vault.adapter,
-			`${this.app.vault.configDir}/plugins/note-weaver/agent-logs`,
+			`${this.app.vault.configDir}/plugins/note-weaver/logs`,
 		);
 		await this.logger.initialize();
 
@@ -37,9 +37,83 @@ export default class NoteWeaver extends Plugin {
 			data: { version: this.manifest.version },
 		});
 
-		this.webService = new WebService(this.settings.webSearchMaxResults, this.logger);
+		this.webService = new WebService(
+			this.settings.webSearchMaxResults,
+			this.logger,
+		);
 		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
-		this.vaultService = new VaultService(this.app, this.logger, this.webService);
+
+		const subAgentClient = new OpenAIChatClient({
+			baseUrl: this.settings.baseUrl,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
+			model: this.settings.modelName,
+			maxTokens: this.settings.maxTokens,
+			thinkingMode: this.settings.thinkingMode,
+			reasoningEffort: this.settings.reasoningEffort,
+		});
+
+		const subAgentService = new SubAgentService(
+			subAgentClient,
+			{
+				model: this.settings.modelName,
+				maxTokens: this.settings.maxTokens,
+				maxToolRounds: 5,
+				thinkingMode: this.settings.thinkingMode,
+				reasoningEffort: this.settings.reasoningEffort,
+			},
+			this.logger,
+		);
+
+		this.vaultService = new VaultService(
+			this.app,
+			this.logger,
+			this.webService,
+			subAgentService,
+		);
+		subAgentService.setToolExecutor((calls) =>
+			this.vaultService.executeToolCalls(calls),
+		);
+
+		// 初始化 Agent 运行时
+		this.toolGateway = new ToolGateway();
+		this.vaultService.registerTools(this.toolGateway);
+
+		const llmClient = new OpenAIChatClient({
+			baseUrl: this.settings.baseUrl,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
+			model: this.settings.modelName,
+			maxTokens: this.settings.maxTokens,
+			thinkingMode: this.settings.thinkingMode,
+			reasoningEffort: this.settings.reasoningEffort,
+		});
+
+		this.agentRuntime = new AgentRuntime(
+			llmClient,
+			this.toolGateway,
+			{
+				model: this.settings.modelName,
+				maxTokens: this.settings.maxTokens,
+				maxToolRounds: 10,
+				thinkingMode: this.settings.thinkingMode,
+				reasoningEffort: this.settings.reasoningEffort,
+			},
+		);
+
+		const quickAskClient = new OpenAIChatClient({
+			baseUrl: this.settings.baseUrl,
+			apiKey: this.decodeApiKey(this.settings.apiKey),
+			model: this.settings.modelName,
+			maxTokens: Math.min(this.settings.maxTokens, 4096),
+			thinkingMode: false,
+			reasoningEffort: "high",
+		});
+
+		const quickAskController = new QuickAskController(this.app, {
+			icClient: quickAskClient,
+			config: this.settings.quickAsk,
+		});
+		quickAskController.load();
+		this.register(() => quickAskController.unload());
 
 		const statusBarItemEl = this.addStatusBarItem();
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -92,13 +166,16 @@ export default class NoteWeaver extends Plugin {
 			},
 		});
 
-		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, {
-			getChatStreamWithTools: this.getChatStreamWithTools.bind(this),
-			vaultService: this.vaultService,
-			ragEngine: this.ragEngine,
-			settings: this.settings,
-			logger: this.logger,
-		}));
+		this.registerView(
+			VIEW_TYPE_CHAT,
+			(leaf) =>
+				new ChatView(leaf, {
+					agentRuntime: this.agentRuntime,
+					ragEngine: this.ragEngine,
+					settings: this.settings,
+					logger: this.logger,
+				}),
+		);
 
 		this.addRibbonIcon("bot", "AI 助手", async () => {
 			await this.activateView();
@@ -129,10 +206,6 @@ export default class NoteWeaver extends Plugin {
 		});
 	}
 
-	/**
-	 * 激活或创建插件视图
-	 * 如果视图已存在则切换到该视图，否则创建新视图
-	 */
 	async activateView(): Promise<WorkspaceLeaf | null> {
 		const { workspace } = this.app;
 
@@ -167,13 +240,6 @@ export default class NoteWeaver extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	getOpenAIClient(): OpenAI {
-		return createOpenAIClient(
-			this.settings.baseUrl,
-			this.decodeApiKey(this.settings.apiKey),
-		);
-	}
-
 	private decodeApiKey(encoded: string): string {
 		try {
 			return atob(encoded);
@@ -182,38 +248,6 @@ export default class NoteWeaver extends Plugin {
 		}
 	}
 
-	getChatStreamWithTools(
-		messages: ApiMessage[],
-		signal?: AbortSignal,
-	) {
-		const client = this.getOpenAIClient();
-		return chatStreamWithTools(
-			client,
-			this.settings.modelName,
-			messages,
-			getToolDefinitions(),
-			this.settings.maxTokens,
-			this.settings.thinkingMode,
-			this.settings.reasoningEffort,
-			signal,
-		);
-	}
-
-	/**
-	 * 验证插件配置的有效性
-	 *
-	 * 验证步骤:
-	 * 1. 检查 URL 和 API Key 是否可以正常连接到 OpenAI 兼容 API
-	 * 2. 检查指定模型是否存在且可用
-	 *
-	 * @returns [boolean, string] - 返回元组，[0] 表示是否配置有效，[1] 为状态消息
-	 *
-	 * @example
-	 * const [isValid, message] = await this.validateConfig();
-	 * if (!isValid) {
-	 *   new Notice(`配置无效: ${message}`);
-	 * }
-	 */
 	async validateConfig(): Promise<[boolean, string]> {
 		const client = new OpenAI({
 			baseURL: this.settings.baseUrl,
@@ -221,7 +255,6 @@ export default class NoteWeaver extends Plugin {
 			dangerouslyAllowBrowser: true,
 		});
 
-		// 步骤1: 验证 URL 和 API Key
 		try {
 			await client.models.list();
 		} catch (error) {
@@ -237,7 +270,6 @@ export default class NoteWeaver extends Plugin {
 			];
 		}
 
-		// 步骤2: 验证模型
 		try {
 			await client.chat.completions.create({
 				model: this.settings.modelName,

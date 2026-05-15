@@ -16,6 +16,9 @@ const context = await esbuild.context({
   },
   entryPoints: ["src/main.ts"],
   bundle: true,
+  alias: {
+    "@": "./src",
+  },
   external: [
     "obsidian",
     "electron",
@@ -34,6 +37,7 @@ const context = await esbuild.context({
   ],
   format: "cjs",
   target: "es2018",
+  jsx: "automatic",
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,

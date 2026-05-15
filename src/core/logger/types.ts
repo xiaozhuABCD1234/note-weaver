@@ -2,7 +2,7 @@ export interface LogEntry {
   id: string;
   timestamp: string;
   level: "debug" | "info" | "warn" | "error";
-  type: "chat" | "tool" | "rag" | "api" | "system" | "command";
+  type: "chat" | "tool" | "rag" | "api" | "system" | "command" | "subagent";
   message: string;
   data?: Record<string, unknown>;
   truncated?: string[];

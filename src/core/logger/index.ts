@@ -1,5 +1,6 @@
 import { DataAdapter, normalizePath } from "obsidian";
 import { LogEntry, LoggerConfig, DEFAULT_LOGGER_CONFIG } from "./types";
+import type { IAgentLogger } from "./interface";
 
 function generateId(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -10,7 +11,7 @@ function generateId(): string {
   return result;
 }
 
-export class AgentLogger {
+export class AgentLogger implements IAgentLogger {
   private adapter: DataAdapter;
   private config: LoggerConfig;
   private logDir: string;

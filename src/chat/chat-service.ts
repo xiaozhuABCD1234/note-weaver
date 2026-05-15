@@ -1,39 +1,23 @@
 import type { App } from "obsidian";
-import type { ApiMessage, ChatMessage, StreamEvent, ToolCall, ToolResultMessage } from "../types";
-import { getActiveNoteContext, getSelectedText } from "../services/note-operations";
-import { buildSystemPrompt } from "../prompts/system-prompt";
+import type { ApiMessage, ChatMessage } from "@/types";
+import { getActiveNoteContext, getSelectedText } from "@/services/note-operations";
+import { buildSystemPrompt } from "@/prompts/system-prompt";
+import type { IAgentLogger } from "@/core/logger/interface";
+import type { NoteWeaverSettings } from "@/settings";
+import type { AgentRuntime } from "@/core/agent";
 
 export interface ChatDeps {
-	getChatStreamWithTools(
-		messages: ApiMessage[],
-		signal?: AbortSignal,
-	): AsyncGenerator<StreamEvent>;
-	vaultService: {
-		executeToolCalls(calls: ToolCall[]): Promise<ToolResultMessage[]>;
-		readonly lastWritePath: string | null;
-		readonly lastWriteContent: string | null;
-	};
+	agentRuntime: AgentRuntime;
 	ragEngine: {
 		getContextForQuery(query: string): Promise<string>;
 	};
-	readonly settings: {
-		apiKey: string;
-		rag: { enabled: boolean };
-	};
-	logger: {
-		log(entry: {
-			level: string;
-			type: string;
-			message: string;
-			data?: Record<string, unknown>;
-		}): void;
-	};
+	readonly settings: Pick<NoteWeaverSettings, "apiKey" | "rag">;
+	logger: IAgentLogger;
 }
 
 export interface ChatEventHandler {
 	onMessagesChanged(messages: ApiMessage[]): Promise<void>;
 	onLoadingChanged(loading: boolean): void;
-	onWritePreview(path: string, content: string): Promise<void>;
 	onNotice(message: string): void;
 }
 
@@ -107,82 +91,34 @@ export class ChatOrchestrator {
 		this.messages.push(aiMessage);
 
 		try {
-			let currentMessages: ApiMessage[] = [
+			const currentMessages: ApiMessage[] = [
 				systemMessage,
 				...currentDisplayMessages,
 				userMessage,
 			];
-			let fullReply = "";
-			let toolRounds = 0;
 
-			while (toolRounds < this.maxToolRounds) {
-				const stream = this.deps.getChatStreamWithTools(
-					currentMessages,
-					this.abortController.signal,
-				);
+			const result = await this.deps.agentRuntime.run(
+				currentMessages,
+				this.abortController.signal,
+				(delta) => {
+					aiMessage.content += delta;
+					void this.handler.onMessagesChanged([...this.messages]);
+				},
+			);
 
-				let toolCalls: ToolCall[] | null = null;
-				let streamedContent = "";
-				let reasoningContent = "";
+			aiMessage.content = result.content;
+			await this.handler.onMessagesChanged([...this.messages]);
 
-				for await (const event of stream) {
-					if (event.type === "content") {
-						streamedContent += event.content;
-						fullReply += event.content;
-						aiMessage.content = fullReply;
-						await this.handler.onMessagesChanged(this.messages);
-					} else if (event.type === "tool_calls") {
-						toolCalls = event.calls;
-						reasoningContent = event.reasoningContent;
-					}
-				}
-
-				if (toolCalls && toolCalls.length > 0) {
-					const toolNames = toolCalls.map(tc => tc.function.name).join(", ");
-					this.handler.onNotice(`🤖 AI 正在执行: ${toolNames}`);
-
-					this.deps.logger.log({
-						level: "info",
-						type: "tool",
-						message: `AI 调用工具: ${toolNames}`,
-						data: { toolCalls: toolCalls.map(tc => ({ name: tc.function.name, args: tc.function.arguments })) },
-					});
-
-					const results = await this.deps.vaultService.executeToolCalls(toolCalls);
-
-					currentMessages = [
-						...currentMessages,
-						{ role: "assistant", content: streamedContent || null, tool_calls: toolCalls, reasoning_content: reasoningContent || null },
-						...results,
-					];
-
-					if (this.deps.vaultService.lastWriteContent) {
-						await this.handler.onWritePreview(
-							this.deps.vaultService.lastWritePath ?? "",
-							this.deps.vaultService.lastWriteContent,
-						);
-					}
-
-					toolRounds++;
-					continue;
-				}
-
-				break;
-			}
-
-			if (toolRounds >= this.maxToolRounds) {
-				fullReply += "\n\n*[已超过最大工具调用轮数]*";
+			if (result.toolRounds >= this.maxToolRounds) {
+				aiMessage.content += "\n\n*[已超过最大工具调用轮数]*";
 				this.handler.onNotice("AI 工具调用次数过多，已停止");
 			}
 
-			aiMessage.content = fullReply;
-			await this.handler.onMessagesChanged(this.messages);
-
-			this.deps.logger.log({
+			this.deps.logger.logLarge({
 				level: "info",
 				type: "chat",
 				message: "AI 回复完成",
-				data: { replyLength: fullReply.length, toolRounds },
+				data: { reply: result.content, replyLength: result.content.length, toolRounds: result.toolRounds },
 			});
 		} catch (error) {
 			if (error instanceof Error && error.name === "AbortError") {
@@ -207,7 +143,7 @@ export class ChatOrchestrator {
 					message: `AI 响应失败: ${error instanceof Error ? error.message : "未知错误"}`,
 				});
 			}
-			await this.handler.onMessagesChanged(this.messages);
+			await this.handler.onMessagesChanged([...this.messages]);
 		} finally {
 			this.isLoading = false;
 			this.handler.onLoadingChanged(false);
@@ -219,11 +155,13 @@ export class ChatOrchestrator {
 		}
 	}
 
+	abort(): void {
+		this.abortController?.abort();
+	}
+
 	cleanup(): void {
-		if (this.abortController) {
-			this.abortController.abort();
-			this.abortController = null;
-		}
+		this.abort();
+		this.abortController = null;
 		if (this.escapeHandler) {
 			window.removeEventListener("keydown", this.escapeHandler);
 			this.escapeHandler = null;

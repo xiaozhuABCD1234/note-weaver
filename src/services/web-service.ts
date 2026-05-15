@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import type { AgentLogger } from "../core/logger/index";
+import type { AgentLogger } from "@/core/logger/index";
 
 export interface SearchResult {
 	title: string;
