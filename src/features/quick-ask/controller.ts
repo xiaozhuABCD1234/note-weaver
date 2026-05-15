@@ -112,7 +112,7 @@ export class QuickAskController {
 				close();
 				return;
 			}
-			if (e.key === "Enter" && !e.shiftKey && input.value.trim()) {
+			if (e.key === "Enter" && !e.shiftKey && !e.isComposing && input.value.trim()) {
 				e.preventDefault();
 				sendBtn.click();
 			}
