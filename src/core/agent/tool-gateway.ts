@@ -3,14 +3,11 @@ import type { RegisteredTool, ToolHandler, ToolResult } from "./types";
 
 export class ToolGateway {
   private handlers = new Map<string, ToolHandler>();
-  private definitions: ToolDefinition[] = [];
+  private definitions = new Map<string, ToolDefinition>();
 
   register(name: string, handler: ToolHandler, definition: ToolDefinition): void {
-    if (this.handlers.has(name)) {
-      console.warn(`[ToolGateway] Overwriting existing tool: ${name}`);
-    }
     this.handlers.set(name, handler);
-    this.definitions.push(definition);
+    this.definitions.set(name, definition);
   }
 
   registerMany(tools: RegisteredTool[]): void {
@@ -49,7 +46,7 @@ export class ToolGateway {
   }
 
   getDefinitions(): ToolDefinition[] {
-    return this.definitions;
+    return Array.from(this.definitions.values());
   }
 
   hasTool(name: string): boolean {
@@ -58,6 +55,6 @@ export class ToolGateway {
 
   clear(): void {
     this.handlers.clear();
-    this.definitions = [];
+    this.definitions.clear();
   }
 }

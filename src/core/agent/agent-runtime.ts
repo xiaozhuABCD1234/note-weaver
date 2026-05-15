@@ -20,6 +20,7 @@ export class AgentRuntime {
     let fullContent = "";
     let toolRounds = 0;
     let lastError: string | undefined;
+    let lastRoundHadToolCalls = false;
 
     while (toolRounds < this.config.maxToolRounds) {
       const stream = this.llmClient.chat(
@@ -30,6 +31,7 @@ export class AgentRuntime {
 
       let toolCalls: ToolCall[] | null = null;
       let streamedContent = "";
+      let reasoningContent = "";
 
       try {
         for await (const event of stream) {
@@ -39,6 +41,7 @@ export class AgentRuntime {
             onStream?.(event.content);
           } else if (event.type === "tool_calls") {
             toolCalls = event.calls;
+            reasoningContent = event.reasoningContent;
           }
         }
       } catch (e) {
@@ -57,8 +60,18 @@ export class AgentRuntime {
       });
 
       if (decision === "stop") {
+        if (lastRoundHadToolCalls && !streamedContent && !lastError) {
+          currentMessages.push({
+            role: "user",
+            content: "请根据以上工具执行结果回答用户的问题。",
+          });
+          lastRoundHadToolCalls = false;
+          continue;
+        }
         break;
       }
+
+      lastRoundHadToolCalls = false;
 
       if (toolCalls && toolCalls.length > 0) {
         const results = await this.toolGateway.executeCalls(toolCalls);
@@ -67,6 +80,7 @@ export class AgentRuntime {
           role: "assistant",
           content: streamedContent || null,
           tool_calls: toolCalls,
+          reasoning_content: reasoningContent || null,
         };
 
         const toolResultMessages: ApiMessage[] = results.map((r, i) => ({
@@ -82,7 +96,12 @@ export class AgentRuntime {
         ];
 
         toolRounds++;
+        lastRoundHadToolCalls = true;
       }
+    }
+
+    if (!fullContent && toolRounds > 0) {
+      fullContent = "已根据工具执行结果完成操作。";
     }
 
     return {

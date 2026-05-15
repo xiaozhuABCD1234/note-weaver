@@ -15,12 +15,24 @@ class MockChatClient implements IChatClient {
   async *chat(
     _messages: ApiMessage[],
     _tools: ToolDefinition[],
-    _signal?: AbortSignal,
+    signal?: AbortSignal,
   ): AsyncGenerator<StreamEvent> {
+    if (signal?.aborted) {
+      const err = new Error("The operation was aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+
     const events = this.responses[this.callCount];
     if (!events) return;
     this.callCount++;
+
     for (const event of events) {
+      if (signal?.aborted) {
+        const err = new Error("The operation was aborted");
+        err.name = "AbortError";
+        throw err;
+      }
       yield event;
     }
   }
@@ -157,7 +169,7 @@ describe("AgentRuntime", () => {
     expect(onStream).toHaveBeenNthCalledWith(2, "World");
   });
 
-  it("handles abort signal", async () => {
+  it("throws AbortError when signal is already aborted before run", async () => {
     const client = new MockChatClient([
       [{ type: "content", content: "Partial content" }],
     ]);
@@ -165,13 +177,63 @@ describe("AgentRuntime", () => {
     const controller = new AbortController();
     controller.abort();
 
-    // The mock doesn't check the AbortSignal, but the runtime should
-    // propagate the signal. Since our mock doesn't check it, this
-    // just verifies the signal is accepted.
-    const result = await runtime.run(
+    await expect(runtime.run(
+      [{ role: "user", content: "test" }],
+      controller.signal,
+    )).rejects.toThrow("The operation was aborted");
+  });
+
+  it("throws AbortError when signal is aborted mid-stream", async () => {
+    const client = new MockChatClient([
+      [
+        { type: "content", content: "Hello " },
+        { type: "content", content: "World" },
+      ],
+    ]);
+    const runtime = new AgentRuntime(client, createGateway(), baseConfig());
+    const controller = new AbortController();
+
+    const runPromise = runtime.run(
       [{ role: "user", content: "test" }],
       controller.signal,
     );
-    expect(result.content).toBe("Partial content");
+
+    controller.abort();
+
+    await expect(runPromise).rejects.toThrow("The operation was aborted");
+  });
+
+  it("returns fallback content when max rounds reached with only tool calls", async () => {
+    const toolCallResponse: StreamEvent = {
+      type: "tool_calls",
+      calls: [{
+        id: "call_1",
+        type: "function",
+        function: { name: "echo", arguments: '{"msg":"loop"}' },
+      }],
+      reasoningContent: "",
+    };
+
+    // Each LLM response is only tool calls (no content), reaching max rounds
+    const client = new MockChatClient([
+      [toolCallResponse],
+      [toolCallResponse],
+      [toolCallResponse],
+      [toolCallResponse],
+      [toolCallResponse],
+      [toolCallResponse], // forced extra round (also tool calls only)
+    ]);
+    const runtime = new AgentRuntime(
+      client,
+      createGateway(),
+      { ...baseConfig(), maxToolRounds: 5 },
+    );
+
+    const result = await runtime.run([
+      { role: "user", content: "Loop" },
+    ]);
+
+    expect(result.toolRounds).toBe(5);
+    expect(result.content).toBe("已根据工具执行结果完成操作。");
   });
 });

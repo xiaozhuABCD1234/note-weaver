@@ -1,7 +1,7 @@
 export { AgentRuntime } from "./agent-runtime";
 export { ToolGateway } from "./tool-gateway";
 export { decideNext } from "./loop-decision";
-export { truncateToolResult, progressiveCompress, setCompressionBudget } from "./result-compressor";
+export { truncateToolResult } from "./result-compressor";
 export type {
   AgentConfig,
   AgentRunResult,
