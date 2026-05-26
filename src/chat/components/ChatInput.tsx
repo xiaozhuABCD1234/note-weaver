@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { Send, Square } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
@@ -72,7 +72,7 @@ export function ChatInput({ onSend, onCancel, isLoading, placeholder }: ChatInpu
           {isLoading ? (
             <Square size={16} fill="currentColor" strokeWidth={0} />
           ) : (
-            <ArrowUp size={18} strokeWidth={2.5} />
+            <Send size={18} strokeWidth={2.5} />
           )}
         </button>
       </div>

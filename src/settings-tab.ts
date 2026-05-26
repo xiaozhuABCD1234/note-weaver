@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import NoteWeaver from "@/main";
 import type { FileScope } from "@/core/rag/types";
 
@@ -27,12 +27,13 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
+		// ── API 设置 ──
+		new Setting(containerEl).setName("API 设置").setHeading();
+
 		new Setting(containerEl)
 			.setName("API key")
-			.setDesc(
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		"用于调用 LLM API 的密钥，支持 OpenAI、Claude 等服务。存储时做基础掩码处理。",
-			)
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("用于调用 LLM API 的密钥。存储时做基础掩码处理。")
 			.addText((text) =>
 				text
 					.setPlaceholder("Sk-...")
@@ -57,6 +58,10 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 				}
 			});
 
+		new Setting(containerEl).setDesc(
+			"API key 存储在本地插件配置中，请确保 vault 环境安全。",
+		);
+
 		new Setting(containerEl)
 			.setName("Base URL")
 			.setDesc("API 服务器地址，不同服务商地址不同")
@@ -75,8 +80,8 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			.setDesc("要使用的模型名称，如 gpt-4、claude-3-5-sonnet")
 			.addText((text) =>
 				text
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("deepseek-v4-flash")
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setPlaceholder("deepseek-v4-flash")
 					.setValue(this.plugin.settings.modelName)
 					.onChange(async (value) => {
 						this.plugin.settings.modelName = value;
@@ -86,8 +91,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Max tokens")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("每次请求的最大 Token 数，防止 JSON 被截断")
+			.setDesc("每次请求的最大 token 数")
 			.addText((text) =>
 				text
 					.setPlaceholder("16384")
@@ -101,8 +105,22 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// ── 思考模式设置 ──
-		new Setting(containerEl).setName("思考模式").setHeading();
+		new Setting(containerEl)
+			.setName("验证连接")
+			.setDesc("测试当前 API 配置是否可用")
+			.addButton((button) =>
+				button.setButtonText("验证").onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText("验证中...");
+					const [, msg] = await this.plugin.validateConfig();
+					new Notice(msg);
+					button.setDisabled(false);
+					button.setButtonText("验证");
+				}),
+			);
+
+		// ── 模型行为 ──
+		new Setting(containerEl).setName("模型行为").setHeading();
 
 		const effortSetting = new Setting(containerEl);
 
@@ -135,60 +153,7 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 		effortSetting.setDisabled(!this.plugin.settings.thinkingMode);
 
-		// ── 网络搜索设置 ──
-		new Setting(containerEl).setName("网络搜索").setHeading();
-
-		new Setting(containerEl)
-			.setName("启用网络搜索")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("开启后，AI 助手可通过 DuckDuckGo 搜索互联网获取实时信息")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.webSearchEnabled)
-					.onChange(async (value) => {
-						this.plugin.settings.webSearchEnabled = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("最大搜索结果数")
-			.setDesc("每次搜索返回的最大结果数量")
-			.addText((text) =>
-				text
-					.setPlaceholder("5")
-					.setValue(String(this.plugin.settings.webSearchMaxResults))
-					.onChange(async (value) => {
-						const num = parseInt(value, 10);
-						if (!isNaN(num) && num > 0 && num <= 20) {
-							this.plugin.settings.webSearchMaxResults = num;
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-
-		// ── Quick Ask 设置 ──
-		new Setting(containerEl).setName("Quick ask").setHeading();
-
-		new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setName("启用 Quick ask")
-			.setDesc("在编辑器中输入 @ 触发内联 AI 问答面板")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.quickAsk.enabled)
-					.onChange(async (value) => {
-						this.plugin.settings.quickAsk.enabled = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl).setDesc(
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			"API key 存储在本地插件配置中，请确保 Vault 环境安全。",
-		);
-
-		// ── 知识库设置 ──
+		// ── 知识库 ──
 		new Setting(containerEl).setName("知识库").setHeading();
 
 		new Setting(containerEl)
@@ -204,12 +169,12 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// ── 联想笔记设置 ──
+		// ── 联想笔记 ──
 		new Setting(containerEl).setName("联想笔记").setHeading();
 
 		new Setting(containerEl)
-			.setName("启用联想笔记")
-			.setDesc("开启后，AI 助手会自动查找与当前笔记相关的其他笔记作为上下文")
+			.setName("启用")
+			.setDesc("开启后 AI 助手会自动查找与当前笔记相关的其他笔记作为上下文")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.rag.enabled)
@@ -295,6 +260,53 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 					.setValue(String(this.plugin.settings.rag.linkDepth))
 					.onChange(async (value: string) => {
 						this.plugin.settings.rag.linkDepth = parseInt(value, 10);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// ── 网络搜索 ──
+		new Setting(containerEl).setName("网络搜索").setHeading();
+
+		new Setting(containerEl)
+			.setName("启用")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("开启后 AI 助手可通过 DuckDuckGo 搜索互联网获取实时信息")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.webSearchEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.webSearchEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("最大搜索结果数")
+			.setDesc("每次搜索返回的最大结果数量")
+			.addText((text) =>
+				text
+					.setPlaceholder("5")
+					.setValue(String(this.plugin.settings.webSearchMaxResults))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num > 0 && num <= 20) {
+							this.plugin.settings.webSearchMaxResults = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		// ── Quick ask ──
+		new Setting(containerEl).setName("Quick ask").setHeading();
+
+		new Setting(containerEl)
+			.setName("启用")
+			.setDesc("在编辑器中输入 @ 触发内联 AI 问答面板")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.quickAsk.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.quickAsk.enabled = value;
 						await this.plugin.saveSettings();
 					}),
 			);
