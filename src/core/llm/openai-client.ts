@@ -12,22 +12,22 @@ export interface OpenAIClientConfig {
 }
 
 export class OpenAIChatClient implements IChatClient {
-  private client: OpenAI;
-  private model: string;
-  private maxTokens: number;
-  private thinkingMode: boolean;
-  private reasoningEffort: string;
+  private client: OpenAI | null = null;
+  private config: OpenAIClientConfig;
 
   constructor(config: OpenAIClientConfig) {
-    this.client = new OpenAI({
-      baseURL: config.baseUrl,
-      apiKey: config.apiKey,
-      dangerouslyAllowBrowser: true,
-    });
-    this.model = config.model;
-    this.maxTokens = config.maxTokens;
-    this.thinkingMode = config.thinkingMode;
-    this.reasoningEffort = config.reasoningEffort;
+    this.config = { ...config };
+  }
+
+  private getClient(): OpenAI {
+    if (!this.client) {
+      this.client = new OpenAI({
+        baseURL: this.config.baseUrl,
+        apiKey: this.config.apiKey,
+        dangerouslyAllowBrowser: true,
+      });
+    }
+    return this.client;
   }
 
   async *chat(
@@ -36,19 +36,19 @@ export class OpenAIChatClient implements IChatClient {
     signal?: AbortSignal,
   ): AsyncGenerator<StreamEvent> {
     const createParams: Record<string, unknown> = {
-      model: this.model,
+      model: this.config.model,
       messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       stream: true,
       tools: tools as OpenAI.Chat.Completions.ChatCompletionTool[],
-      max_tokens: this.maxTokens,
+      max_tokens: this.config.maxTokens,
     };
 
-    if (this.thinkingMode) {
-      createParams.reasoning_effort = this.reasoningEffort ?? "high";
+    if (this.config.thinkingMode) {
+      createParams.reasoning_effort = this.config.reasoningEffort ?? "high";
       createParams.extra_body = { thinking: { type: "enabled" } };
     }
 
-    const stream = await this.client.chat.completions.create(
+    const stream = await this.getClient().chat.completions.create(
       createParams as unknown as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
       { signal },
     );
