@@ -12,6 +12,8 @@ export function ChatInput({ onSend, onCancel, isLoading, placeholder }: ChatInpu
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const rowCount = Math.min(Math.max(value.split("\n").length, 1), 6);
+
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -45,23 +47,32 @@ export function ChatInput({ onSend, onCancel, isLoading, placeholder }: ChatInpu
 
   return (
     <div className="input-wrapper">
+      <label htmlFor="chat-input" className="input-label-hidden">
+        输入消息
+      </label>
       <textarea
+        id="chat-input"
         ref={textareaRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder ?? "输入消息..."}
         disabled={isLoading}
+        rows={rowCount}
+        aria-label="输入消息"
       />
       <div className="controls-bar">
         <button
           className={`send-button${isLoading ? " is-stop" : ""}`}
           onClick={handleClick}
+          aria-label={isLoading ? "停止生成" : "发送消息"}
+          aria-busy={isLoading}
+          disabled={!isLoading && !value.trim()}
         >
           {isLoading ? (
-            <Square size={12} fill="currentColor" strokeWidth={0} />
+            <Square size={16} fill="currentColor" strokeWidth={0} />
           ) : (
-            <ArrowUp size={16} strokeWidth={2.5} />
+            <ArrowUp size={18} strokeWidth={2.5} />
           )}
         </button>
       </div>

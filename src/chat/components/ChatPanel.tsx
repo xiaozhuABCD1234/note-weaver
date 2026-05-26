@@ -41,7 +41,13 @@ export function ChatPanel({ deps, component, pendingSelectionRef }: ChatPanelPro
   return (
     <div className="chat-container">
       <div className="chat-wrapper">
-        <MessageList messages={messages} component={component} app={app} />
+        <MessageList
+          messages={messages}
+          component={component}
+          app={app}
+          isLoading={isLoading}
+          onSendExample={handleSend}
+        />
         <ChatInput
           onSend={handleSend}
           onCancel={abort}
