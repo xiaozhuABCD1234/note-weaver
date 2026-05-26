@@ -42,6 +42,9 @@ export default class NoteWeaver extends Plugin {
 		this.webService = new WebService(
 			this.settings.webSearchMaxResults,
 			this.logger,
+			this.settings.webSearchEnabled,
+			this.settings.webSearchEngine,
+			this.settings.braveSearchApiKey,
 		);
 		this.ragEngine = new RagEngine(
 			this.app,

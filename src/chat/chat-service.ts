@@ -11,7 +11,7 @@ export interface ChatDeps {
 	ragEngine: {
 		getContextForQuery(query: string): Promise<string>;
 	};
-	readonly settings: Pick<NoteWeaverSettings, "apiKey" | "rag">;
+	readonly settings: Pick<NoteWeaverSettings, "apiKey" | "rag" | "webSearchEnabled">;
 	logger: IAgentLogger;
 }
 
@@ -173,7 +173,7 @@ export class ChatOrchestrator {
 		const sel = selection ?? getSelectedText(app);
 
 		const sysContent: string[] = [
-			buildSystemPrompt(),
+			buildSystemPrompt(this.deps.settings.webSearchEnabled),
 		];
 
 		if (note) {

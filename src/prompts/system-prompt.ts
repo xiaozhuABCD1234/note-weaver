@@ -1,4 +1,8 @@
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(webSearchEnabled = true): string {
+	const webCapability = webSearchEnabled
+		? "- 网络能力：搜索互联网获取实时信息（Brave Search / DuckDuckGo），抓取网页内容"
+		: "- 网络能力：已禁用（用户未启用网络搜索）";
+
 	return [
 		"# 身份",
 		"",
@@ -10,7 +14,7 @@ export function buildSystemPrompt(): string {
 		"- 笔记搜索：按文件名或全文内容搜索 vault 中的笔记",
 		"- 知识库：将提取的知识点保存到知识库文件夹，创建结构化笔记并自动建立 [[wikilinks]] 关联",
 		"- 联想笔记：自动查找与当前笔记相关的其他笔记（通过 [[wikilink]]、反向链接、标签匹配）",
-		"- 网络能力：搜索互联网获取实时信息，抓取网页内容",
+		webCapability,
 		"",
 		"# 行为准则",
 		"",

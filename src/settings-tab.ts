@@ -270,15 +270,80 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("启用")
 			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("开启后 AI 助手可通过 DuckDuckGo 搜索互联网获取实时信息")
+			.setDesc("开启后 AI 助手可通过搜索互联网获取实时信息")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.webSearchEnabled)
 					.onChange(async (value) => {
 						this.plugin.settings.webSearchEnabled = value;
+						this.plugin.webService.updateConfig(
+							this.plugin.settings.webSearchMaxResults,
+							value,
+						);
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("搜索引擎")
+			.setDesc("选择网络搜索的后端引擎")
+			.addDropdown((dropdown) =>
+				dropdown
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.addOption("brave", "Brave Search API")
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.addOption("duckduckgo", "DuckDuckGo")
+					.setValue(this.plugin.settings.webSearchEngine)
+					.onChange(async (value: string) => {
+						const engine = value as "brave" | "duckduckgo";
+						this.plugin.settings.webSearchEngine = engine;
+						this.plugin.webService.updateConfig(
+							this.plugin.settings.webSearchMaxResults,
+							this.plugin.settings.webSearchEnabled,
+							engine,
+						);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		const braveKeySetting = new Setting(containerEl)
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setName("Brave Search API Key")
+			.setDesc("注册 https://brave.com/search/api/ 获取免费 API Key")
+			.addText((text) =>
+				text
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("BSA...")
+					.setValue(this.plugin.settings.braveSearchApiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.braveSearchApiKey = value;
+						this.plugin.webService.updateConfig(
+							this.plugin.settings.webSearchMaxResults,
+							this.plugin.settings.webSearchEnabled,
+							undefined,
+							value,
+						);
+						await this.plugin.saveSettings();
+					}),
+			)
+			.then((setting) => {
+				const input = setting.descEl.parentElement?.querySelector(
+					'input[type="text"]',
+				) as HTMLInputElement | null;
+				if (input) {
+					input.type = "password";
+					input.addEventListener("focus", () => {
+						input.type = "text";
+					});
+					input.addEventListener("blur", () => {
+						input.type = "password";
+					});
+				}
+			});
+		if (this.plugin.settings.webSearchEngine !== "brave") {
+			braveKeySetting.settingEl.classList.add("hidden");
+		}
 
 		new Setting(containerEl)
 			.setName("最大搜索结果数")
@@ -291,6 +356,10 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 						const num = parseInt(value, 10);
 						if (!isNaN(num) && num > 0 && num <= 20) {
 							this.plugin.settings.webSearchMaxResults = num;
+							this.plugin.webService.updateConfig(
+								num,
+								this.plugin.settings.webSearchEnabled,
+							);
 							await this.plugin.saveSettings();
 						}
 					}),

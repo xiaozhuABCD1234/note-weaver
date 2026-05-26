@@ -2,6 +2,7 @@ import { DEFAULT_RAG_CONFIG } from "@/core/rag/index";
 import type { RagConfig } from "@/core/rag/types";
 import type { QuickAskConfig } from "@/features/quick-ask";
 import { DEFAULT_QUICK_ASK_CONFIG } from "@/features/quick-ask";
+import type { EngineName } from "@/services/search/engine-registry";
 
 export interface NoteWeaverSettings {
 	apiKey: string;
@@ -13,6 +14,8 @@ export interface NoteWeaverSettings {
 	rag: RagConfig;
 	webSearchEnabled: boolean;
 	webSearchMaxResults: number;
+	webSearchEngine: EngineName;
+	braveSearchApiKey: string;
 	quickAsk: QuickAskConfig;
 	knowledgeBasePath: string;
 }
@@ -27,6 +30,8 @@ export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	rag: DEFAULT_RAG_CONFIG,
 	webSearchEnabled: true,
 	webSearchMaxResults: 5,
+	webSearchEngine: "duckduckgo",
+	braveSearchApiKey: "",
 	quickAsk: DEFAULT_QUICK_ASK_CONFIG,
 	knowledgeBasePath: "知识库",
 };

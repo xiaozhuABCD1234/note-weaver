@@ -64,7 +64,7 @@ export const WEB_SEARCH_DEFINITION: ToolDefinition = {
 	type: "function",
 	function: {
 		name: "web_search",
-		description: "通过 DuckDuckGo 搜索互联网获取实时信息",
+		description: "搜索互联网获取实时信息（支持 Brave Search / DuckDuckGo）",
 		parameters: {
 			type: "object",
 			properties: {

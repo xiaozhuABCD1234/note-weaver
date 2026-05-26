@@ -1,7 +1,6 @@
 const PER_TOOL_LIMITS: Record<string, number> = {
   read_note: 3000,
   search_content: 2000,
-  fetch_webpage: 4000,
 };
 
 export function truncateToolResult(toolName: string, content: string): string {
