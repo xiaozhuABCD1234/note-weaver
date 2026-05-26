@@ -90,10 +90,59 @@ export const FETCH_WEBPAGE_DEFINITION: ToolDefinition = {
 	},
 };
 
+export const GREP_CONTENT_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "grep_content",
+		description: "用正则表达式搜索 vault 中所有 Markdown 笔记的内容，返回匹配的文件路径、行号及匹配行",
+		parameters: {
+			type: "object",
+			properties: {
+				pattern: { type: "string", description: "正则表达式模式（支持 JavaScript RegExp 语法）" },
+				caseSensitive: { type: "boolean", description: "是否区分大小写，默认 false" },
+				maxResults: { type: "number", description: "最大返回结果数，默认 50" },
+			},
+			required: ["pattern"],
+		},
+	},
+};
+
+export const SAVE_KNOWLEDGE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "save_knowledge",
+		description: "将知识点保存到知识库文件夹。创建或更新一篇结构化知识笔记，自动建立 [[wikilinks]] 链接。适用于用户要求整理笔记、提取知识点、构建知识图谱时使用",
+		parameters: {
+			type: "object",
+			properties: {
+				title: { type: "string", description: "知识点标题，用作文件名" },
+				content: { type: "string", description: "笔记正文（Markdown 格式），正文中可用 [[wikilink]] 指向其他笔记" },
+				type: {
+					type: "string",
+					enum: ["concept", "relationship", "summary", "note"],
+					description: "知识类型：concept（概念）、relationship（关系）、summary（摘要）、note（一般笔记）",
+				},
+				tags: {
+					type: "array",
+					items: { type: "string" },
+					description: "标签列表，用于分类和检索",
+				},
+				relatedNotes: {
+					type: "array",
+					items: { type: "string" },
+					description: "关联的笔记路径列表（相对于 vault 根目录）。会自动在笔记底部生成关联笔记链接",
+				},
+			},
+			required: ["title", "content", "type", "tags"],
+		},
+	},
+};
+
 export const SHARED_READONLY_DEFINITIONS: ToolDefinition[] = [
 	READ_NOTE_DEFINITION,
 	SEARCH_NOTES_DEFINITION,
 	SEARCH_CONTENT_DEFINITION,
+	GREP_CONTENT_DEFINITION,
 	LIST_FOLDER_DEFINITION,
 	WEB_SEARCH_DEFINITION,
 	FETCH_WEBPAGE_DEFINITION,

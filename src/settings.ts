@@ -14,6 +14,7 @@ export interface NoteWeaverSettings {
 	webSearchEnabled: boolean;
 	webSearchMaxResults: number;
 	quickAsk: QuickAskConfig;
+	knowledgeBasePath: string;
 }
 
 export const DEFAULT_SETTINGS: NoteWeaverSettings = {
@@ -27,6 +28,5 @@ export const DEFAULT_SETTINGS: NoteWeaverSettings = {
 	webSearchEnabled: true,
 	webSearchMaxResults: 5,
 	quickAsk: DEFAULT_QUICK_ASK_CONFIG,
+	knowledgeBasePath: "知识库",
 };
-
-

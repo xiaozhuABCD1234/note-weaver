@@ -4,13 +4,16 @@ import type { ToolCall, ToolResultMessage } from "@/types";
 import type { ToolGateway, ToolHandler, ToolResult } from "@/core/agent";
 import { WebService } from "./web-service";
 import { SubAgentService } from "./sub-agent-service";
+import { KnowledgeService, type SaveKnowledgeParams } from "./knowledge-service";
 import {
 	READ_NOTE_DEFINITION,
 	SEARCH_NOTES_DEFINITION,
 	SEARCH_CONTENT_DEFINITION,
+	GREP_CONTENT_DEFINITION,
 	LIST_FOLDER_DEFINITION,
 	WEB_SEARCH_DEFINITION,
 	FETCH_WEBPAGE_DEFINITION,
+	SAVE_KNOWLEDGE_DEFINITION,
 } from "./tool-definitions";
 
 export interface VaultFileEntry {
@@ -33,20 +36,30 @@ export class VaultService {
 	private logger: AgentLogger;
 	private webService: WebService;
 	private subAgentService: SubAgentService;
+	private knowledgeService: KnowledgeService;
 
 	constructor(
 		private app: App,
 		logger: AgentLogger,
 		webService: WebService,
 		subAgentService: SubAgentService,
+		knowledgeService: KnowledgeService,
 	) {
 		this.logger = logger;
 		this.webService = webService;
 		this.subAgentService = subAgentService;
+		this.knowledgeService = knowledgeService;
 	}
 
 	registerTools(gateway: ToolGateway): void {
 		gateway.registerMany([
+			{
+				name: "save_knowledge",
+				handler: this.makeHandler(async (args) =>
+					this.knowledgeService.saveKnowledge(args as unknown as SaveKnowledgeParams),
+				),
+				definition: SAVE_KNOWLEDGE_DEFINITION,
+			},
 			{
 				name: "read_note",
 				handler: this.makeHandler((args) => this.readNote(args.path as string)),
@@ -122,11 +135,11 @@ export class VaultService {
 					type: "function",
 					function: {
 						name: "delete_note",
-						description: "永久删除 vault 中的笔记。注意：此操作不可逆，建议先与用户确认再执行",
+						description: "永久删除 vault 中的笔记或空文件夹。注意：此操作不可逆，建议先与用户确认再执行",
 						parameters: {
 							type: "object",
 							properties: {
-								path: { type: "string", description: "要删除的笔记路径" },
+								path: { type: "string", description: "要删除的笔记或空文件夹路径" },
 							},
 							required: ["path"],
 						},
@@ -235,6 +248,17 @@ export class VaultService {
 				},
 			},
 			{
+				name: "grep_content",
+				handler: this.makeHandler(async (args) =>
+					JSON.stringify(await this.grepContent(
+						args.pattern as string,
+						args.caseSensitive as boolean | undefined,
+						args.maxResults as number | undefined,
+					)),
+				),
+				definition: GREP_CONTENT_DEFINITION,
+			},
+			{
 				name: "list_recent_notes",
 				handler: this.makeHandler(async (args) =>
 					JSON.stringify(this.listRecentNotes(args.limit as number | undefined)),
@@ -304,9 +328,14 @@ export class VaultService {
 	}
 
 	async deleteNote(path: string): Promise<string> {
-		const file = this.getFile(path);
-		await this.app.fileManager.trashFile(file);
-		return `Deleted: ${path}`;
+		const normalized = normalizePath(path);
+		const abstractFile = this.app.vault.getAbstractFileByPath(normalized);
+		if (!abstractFile) {
+			throw new Error(`文件或文件夹不存在: ${path}`);
+		}
+		await this.app.fileManager.trashFile(abstractFile);
+		const type = abstractFile instanceof TFolder ? "文件夹" : "笔记";
+		return `${type}已删除: ${normalized}`;
 	}
 
 	async renameNote(path: string, newPath: string): Promise<string> {
@@ -342,6 +371,30 @@ export class VaultService {
 				const start = Math.max(0, idx - 100);
 				const end = Math.min(content.length, idx + query.length + 100);
 				results.push({ path: files[i]!.path, snippet: content.slice(start, end) });
+			}
+		}
+		return results;
+	}
+
+	async grepContent(
+		pattern: string,
+		caseSensitive = false,
+		maxResults = 50,
+	): Promise<Array<{ path: string; line: number; content: string }>> {
+		const regex = new RegExp(pattern, caseSensitive ? "gm" : "gim");
+		const files = this.app.vault.getMarkdownFiles();
+		const results: Array<{ path: string; line: number; content: string }> = [];
+
+		for (const file of files) {
+			if (results.length >= maxResults) break;
+			const content = await this.app.vault.cachedRead(file);
+			const lines = content.split("\n");
+			for (let i = 0; i < lines.length; i++) {
+				if (results.length >= maxResults) break;
+				if (regex.test(lines[i]!)) {
+					results.push({ path: file.path, line: i + 1, content: lines[i]!.trim() });
+					regex.lastIndex = 0;
+				}
 			}
 		}
 		return results;
@@ -453,10 +506,14 @@ export class VaultService {
 					case "rename_note": content = await this.renameNote(args.path as string, args.newPath as string); break;
 					case "search_notes": content = JSON.stringify(this.searchFiles(args.query as string)); break;
 					case "search_content": content = JSON.stringify(await this.searchContent(args.query as string)); break;
+					case "grep_content": content = JSON.stringify(await this.grepContent(args.pattern as string, args.caseSensitive as boolean | undefined, args.maxResults as number | undefined)); break;
 					case "list_folder": content = JSON.stringify(this.listFolder(args.path as string | undefined)); break;
 					case "web_search": content = JSON.stringify(await this.webService.search(args.query as string)); break;
 					case "fetch_webpage": content = await this.webService.fetchPage(args.url as string); break;
 					case "delegate_task": content = await this.subAgentService.runSubAgent(args.prompt as string); break;
+				case "save_knowledge":
+					content = await this.knowledgeService.saveKnowledge(args as unknown as import("./knowledge-service").SaveKnowledgeParams);
+					break;
 					default: throw new Error(`Unknown tool: ${call.function.name}`);
 				}
 				results.push({ role: "tool", tool_call_id: call.id, content });

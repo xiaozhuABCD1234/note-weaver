@@ -1,29 +1,17 @@
 export type FileScope = "current-folder" | "all-vault";
 
-export interface Chunk {
-  content: string;
-  filePath: string;
-  fileName: string;
-  heading: string | null;
-  startPos: number;
-  endPos: number;
-}
-
-export interface SearchResult {
-  chunk: Chunk;
+export interface RelatedNote {
+  path: string;
+  reason: string;
   score: number;
 }
 
 export interface RagConfig {
   enabled: boolean;
-  maxChunks: number;
-  chunkSize: number;
-  chunkOverlap: number;
+  maxRelatedNotes: number;
   scope: FileScope;
+  includeForwardLinks: boolean;
+  includeBacklinks: boolean;
+  includeTagMatches: boolean;
+  linkDepth: number;
 }
-
-export interface TokenIndex {
-  [token: string]: Map<number, { freq: number; chunk: Chunk }>;
-}
-
-

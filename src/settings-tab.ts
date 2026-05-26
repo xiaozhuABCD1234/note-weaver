@@ -188,15 +188,28 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			"API key 存储在本地插件配置中，请确保 Vault 环境安全。",
 		);
 
-		// ── RAG 设置 ──
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		new Setting(containerEl).setName("知识检索 (RAG)").setHeading();
+		// ── 知识库设置 ──
+		new Setting(containerEl).setName("知识库").setHeading();
 
 		new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setName("启用 RAG")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("开启后，AI 助手会自动检索 Vault 中与问题相关的笔记内容作为上下文")
+			.setName("知识库路径")
+			.setDesc("AI 创建知识笔记时的存放文件夹路径，相对于 vault 根目录")
+			.addText((text) =>
+				text
+					.setPlaceholder("知识库")
+					.setValue(this.plugin.settings.knowledgeBasePath)
+					.onChange(async (value) => {
+						this.plugin.settings.knowledgeBasePath = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// ── 联想笔记设置 ──
+		new Setting(containerEl).setName("联想笔记").setHeading();
+
+		new Setting(containerEl)
+			.setName("启用联想笔记")
+			.setDesc("开启后，AI 助手会自动查找与当前笔记相关的其他笔记作为上下文")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.rag.enabled)
@@ -207,48 +220,16 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("最大检索块数")
-			.setDesc("每次查询最多检索多少个相关片段")
+			.setName("最大联想笔记数")
+			.setDesc("每次查询最多关联多少篇笔记")
 			.addText((text) =>
 				text
 					.setPlaceholder("5")
-					.setValue(String(this.plugin.settings.rag.maxChunks))
+					.setValue(String(this.plugin.settings.rag.maxRelatedNotes))
 					.onChange(async (value) => {
 						const num = parseInt(value, 10);
-						if (!isNaN(num) && num > 0 && num <= 50) {
-							this.plugin.settings.rag.maxChunks = num;
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("分块大小（字符）")
-			.setDesc("每个笔记片段的最大字符数")
-			.addText((text) =>
-				text
-					.setPlaceholder("1000")
-					.setValue(String(this.plugin.settings.rag.chunkSize))
-					.onChange(async (value) => {
-						const num = parseInt(value, 10);
-						if (!isNaN(num) && num >= 100 && num <= 10000) {
-							this.plugin.settings.rag.chunkSize = num;
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("分块重叠（字符）")
-			.setDesc("相邻片段之间的重叠字符数")
-			.addText((text) =>
-				text
-					.setPlaceholder("200")
-					.setValue(String(this.plugin.settings.rag.chunkOverlap))
-					.onChange(async (value) => {
-						const num = parseInt(value, 10);
-						if (!isNaN(num) && num >= 0 && num <= 1000) {
-							this.plugin.settings.rag.chunkOverlap = num;
+						if (!isNaN(num) && num >= 1 && num <= 20) {
+							this.plugin.settings.rag.maxRelatedNotes = num;
 							await this.plugin.saveSettings();
 						}
 					}),
@@ -269,17 +250,53 @@ export class NoteWeaverSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("重建索引")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("重新扫描 Vault 中的所有笔记，构建知识索引")
-			.addButton((button) =>
-				button.setButtonText("立即重建").onClick(async () => {
-					button.setDisabled(true);
-					button.setButtonText("重建中...");
-					await this.plugin.buildRagIndex();
-					button.setDisabled(false);
-					button.setButtonText("立即重建");
-				}),
+			.setName("正向链接")
+			.setDesc("包含当前笔记通过 [[wikilink]] 链接到的笔记")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.rag.includeForwardLinks)
+					.onChange(async (value) => {
+						this.plugin.settings.rag.includeForwardLinks = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("反向链接")
+			.setDesc("包含链接到当前笔记的笔记")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.rag.includeBacklinks)
+					.onChange(async (value) => {
+						this.plugin.settings.rag.includeBacklinks = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("标签匹配")
+			.setDesc("包含与当前笔记有相同标签的笔记")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.rag.includeTagMatches)
+					.onChange(async (value) => {
+						this.plugin.settings.rag.includeTagMatches = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("链接深度")
+			.setDesc("正向链接的遍历层数：1 层（仅直接链接）或 2 层（也包含链接的链接）")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("1", "1 层")
+					.addOption("2", "2 层")
+					.setValue(String(this.plugin.settings.rag.linkDepth))
+					.onChange(async (value: string) => {
+						this.plugin.settings.rag.linkDepth = parseInt(value, 10);
+						await this.plugin.saveSettings();
+					}),
 			);
 	}
 }

@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import OpenAI from "openai";
 import { DEFAULT_SETTINGS, NoteWeaverSettings } from "./settings";
 import { NoteWeaverSettingTab } from "./settings-tab";
@@ -8,6 +8,7 @@ import { VaultService } from "./services/vault-service";
 import { SubAgentService } from "./services/sub-agent-service";
 import { AgentLogger } from "./core/logger/index";
 import { WebService } from "./services/web-service";
+import { KnowledgeService } from "./services/knowledge-service";
 import { ToolGateway, AgentRuntime } from "./core/agent";
 import { OpenAIChatClient } from "./core/llm";
 import { QuickAskController } from "./features/quick-ask";
@@ -17,6 +18,7 @@ export default class NoteWeaver extends Plugin {
 	ragEngine!: RagEngine;
 	vaultService!: VaultService;
 	webService!: WebService;
+	knowledgeService!: KnowledgeService;
 	logger!: AgentLogger;
 	toolGateway!: ToolGateway;
 	agentRuntime!: AgentRuntime;
@@ -41,7 +43,15 @@ export default class NoteWeaver extends Plugin {
 			this.settings.webSearchMaxResults,
 			this.logger,
 		);
-		this.ragEngine = new RagEngine(this.app, this.settings.rag, this.logger);
+		this.ragEngine = new RagEngine(
+			this.app,
+			this.settings.rag,
+			() => this.settings.knowledgeBasePath,
+		);
+		this.knowledgeService = new KnowledgeService(
+			this.app,
+			() => this.settings.knowledgeBasePath,
+		);
 
 		const subAgentClient = new OpenAIChatClient({
 			baseUrl: this.settings.baseUrl,
@@ -69,12 +79,12 @@ export default class NoteWeaver extends Plugin {
 			this.logger,
 			this.webService,
 			subAgentService,
+			this.knowledgeService,
 		);
 		subAgentService.setToolExecutor((calls) =>
 			this.vaultService.executeToolCalls(calls),
 		);
 
-		// 初始化 Agent 运行时
 		this.toolGateway = new ToolGateway();
 		this.vaultService.registerTools(this.toolGateway);
 
@@ -121,26 +131,6 @@ export default class NoteWeaver extends Plugin {
 
 		this.addSettingTab(new NoteWeaverSettingTab(this.app, this));
 
-		this.registerEvent(
-			this.app.vault.on("create", (file) => {
-				if (!(file instanceof TFile)) return;
-				this.ragEngine.onFileCreated(file);
-			}),
-		);
-
-		this.registerEvent(
-			this.app.vault.on("modify", (file) => {
-				if (!(file instanceof TFile)) return;
-				this.ragEngine.onFileModified(file);
-			}),
-		);
-
-		this.registerEvent(
-			this.app.vault.on("delete", (file) => {
-				this.ragEngine.onFileDeleted(file.path);
-			}),
-		);
-
 		this.addCommand({
 			id: "ai-modify-selection",
 			name: "AI: 修改选中文本",
@@ -155,14 +145,6 @@ export default class NoteWeaver extends Plugin {
 					leaf.view.setPendingSelection(selection);
 					new Notice("已读取选中文本，请在 AI 助手中输入修改要求");
 				}
-			},
-		});
-
-		this.addCommand({
-			id: "rebuild-rag-index",
-			name: "重建知识索引",
-			callback: async () => {
-				await this.buildRagIndex();
 			},
 		});
 
@@ -187,22 +169,6 @@ export default class NoteWeaver extends Plugin {
 			level: "info",
 			type: "system",
 			message: "Note Weaver 插件已卸载",
-		});
-	}
-
-	async buildRagIndex(): Promise<void> {
-		new Notice("正在重建知识索引...");
-		await this.ragEngine.buildIndex(true);
-		const fileCount = this.ragEngine.getIndexedFileCount();
-		const chunkCount = this.ragEngine.getChunkCount();
-		new Notice(
-			`知识索引重建完成，已索引 ${fileCount} 篇笔记，${chunkCount} 个片段`,
-		);
-		this.logger.log({
-			level: "info",
-			type: "system",
-			message: `知识索引重建完成，已索引 ${fileCount} 篇笔记`,
-			data: { fileCount, chunkCount },
 		});
 	}
 
