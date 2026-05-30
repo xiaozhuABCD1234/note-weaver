@@ -138,6 +138,131 @@ export const SAVE_KNOWLEDGE_DEFINITION: ToolDefinition = {
 	},
 };
 
+export const WRITE_NOTE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "write_note",
+		description: "创建新笔记或覆盖已有笔记",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "笔记路径，相对于 vault 根目录" },
+				content: { type: "string", description: "笔记完整内容，使用 Markdown 格式" },
+			},
+			required: ["path", "content"],
+		},
+	},
+};
+
+export const APPEND_NOTE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "append_note",
+		description: "向已有笔记末尾追加内容",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "笔记路径" },
+				content: { type: "string", description: "要追加的内容" },
+			},
+			required: ["path", "content"],
+		},
+	},
+};
+
+export const DELETE_NOTE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "delete_note",
+		description: "将 vault 中的笔记或空文件夹移入回收站。注意：此操作可通过回收站恢复，建议先与用户确认再执行",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "要删除的笔记或空文件夹路径" },
+			},
+			required: ["path"],
+		},
+	},
+};
+
+export const RENAME_NOTE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "rename_note",
+		description: "重命名或移动笔记到新路径。会自动更新 vault 中所有指向该笔记的内部链接",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "笔记当前路径" },
+				newPath: { type: "string", description: "笔记新路径，可用于重命名或移动到不同文件夹" },
+			},
+			required: ["path", "newPath"],
+		},
+	},
+};
+
+export const EDIT_NOTE_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "edit_note",
+		description: "在笔记中做精确文本替换：查找 oldSnippet 并替换为 newSnippet。适用于修改笔记中的特定段落",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "笔记路径" },
+				oldSnippet: { type: "string", description: "要查找并替换的旧文本" },
+				newSnippet: { type: "string", description: "替换后的新文本" },
+			},
+			required: ["path", "oldSnippet", "newSnippet"],
+		},
+	},
+};
+
+export const GET_NOTE_METADATA_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "get_note_metadata",
+		description: "获取笔记的元数据信息，包括标题、创建时间、修改时间、标签、frontmatter 字段等",
+		parameters: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "笔记路径" },
+			},
+			required: ["path"],
+		},
+	},
+};
+
+export const DELEGATE_TASK_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "delegate_task",
+		description: "将需要大量信息收集、调研或分析的复杂任务委派给子 Agent 执行",
+		parameters: {
+			type: "object",
+			properties: {
+				prompt: { type: "string", description: "子 Agent 需要完成的任务描述" },
+			},
+			required: ["prompt"],
+		},
+	},
+};
+
+export const LIST_RECENT_NOTES_DEFINITION: ToolDefinition = {
+	type: "function",
+	function: {
+		name: "list_recent_notes",
+		description: "列出最近修改的笔记，按修改时间排序。limit 可选，默认返回最近 10 篇",
+		parameters: {
+			type: "object",
+			properties: {
+				limit: { type: "number", description: "返回的笔记数量上限，可选" },
+			},
+			required: [],
+		},
+	},
+};
+
 export const SHARED_READONLY_DEFINITIONS: ToolDefinition[] = [
 	READ_NOTE_DEFINITION,
 	SEARCH_NOTES_DEFINITION,
